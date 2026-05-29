@@ -4,6 +4,7 @@ import { fetchWithConcurrencyLimit } from '../utils/concurrency'
 import { saveCachedWindow, loadCachedWindow, clearCachedWindow } from '../lib/storage'
 import { computeLeaderboard } from '../lib/aggregateGraffiti'
 import type { WorkerRequest, WorkerResponse } from '../lib/aggregateGraffiti'
+import { BEACON_API, CONCURRENCY, QUICK_CACHE_KEY } from '../lib/constants'
 
 // Re-export for App.tsx convenience
 export type { CachedWindow } from '../lib/storage'
@@ -35,11 +36,6 @@ export interface CachedWindow {
   records: Array<{ slot: number; graffiti: string }>
   cachedAt: number
 }
-
-const BEACON_API = 'https://rpc-pulsechain.g4mm4.io/beacon-api'
-const CONCURRENCY = 18
-
-const QUICK_CACHE_KEY = 'pls-graffiti-quick-v1'
 
 function saveQuickResult(data: {
   entries: GraffitiEntry[]
