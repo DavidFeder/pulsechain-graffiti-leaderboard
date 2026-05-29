@@ -1,8 +1,11 @@
-import { isEmptyGraffiti } from './aggregateGraffiti';
+import { isEmptyGraffiti } from './aggregateGraffiti'
 
 /**
- * Decodes the 32-byte graffiti field from a beacon block.
- * Returns a clean human-readable string (trailing null bytes removed).
+ * Decodes the 32-byte `graffiti` field from a beacon block (body.graffiti).
+ *
+ * Beacon graffiti is set by validators using the --graffiti flag on their
+ * consensus client (Lighthouse, Prysm, Teku, etc). It is the correct source
+ * for "validator graffiti" — much more reliable than execution-layer extraData.
  */
 export function decodeGraffiti(hex: string | null | undefined): string {
   if (!hex || hex === '0x' || hex.length < 4) {
@@ -10,16 +13,15 @@ export function decodeGraffiti(hex: string | null | undefined): string {
   }
 
   try {
-    // Remove 0x prefix
+    // Strip 0x prefix and convert hex to bytes
     const cleanHex = hex.startsWith('0x') ? hex.slice(2) : hex
-
-    // Convert hex to Uint8Array
     const bytes = new Uint8Array(cleanHex.length / 2)
+
     for (let i = 0; i < cleanHex.length; i += 2) {
       bytes[i / 2] = parseInt(cleanHex.substr(i, 2), 16)
     }
 
-    // Decode as UTF-8 and strip null bytes + trim
+    // Decode UTF-8, remove null padding (beacon graffiti is 32 bytes), trim
     const text = new TextDecoder('utf-8', { fatal: false }).decode(bytes)
     return text.replace(/\0/g, '').trim()
   } catch (e) {
@@ -28,5 +30,5 @@ export function decodeGraffiti(hex: string | null | undefined): string {
   }
 }
 
-// Re-export for convenience
-export { isEmptyGraffiti } from './aggregateGraffiti';
+// Re-export for convenience (used by consumers who only import this file)
+export { isEmptyGraffiti } from './aggregateGraffiti'
