@@ -5,6 +5,7 @@ import { saveCachedWindow, loadCachedWindow, clearCachedWindow } from '../lib/st
 import { computeLeaderboard } from '../lib/aggregateGraffiti'
 import type { WorkerRequest, WorkerResponse } from '../lib/aggregateGraffiti'
 import { BEACON_API, CONCURRENCY, QUICK_CACHE_KEY } from '../lib/constants'
+import { fetchWithRetry } from '../utils/retry'
 
 // Re-export for App.tsx convenience
 export type { CachedWindow } from '../lib/storage'
@@ -234,7 +235,13 @@ export function useBeaconGraffiti() {
     }));
 
     try {
-      const headRes = await fetch(`${BEACON_API}/eth/v1/beacon/headers/head`, { signal });
+      // Head fetch with retry
+      const headRes = await fetchWithRetry(
+        `${BEACON_API}/eth/v1/beacon/headers/head`,
+        { signal },
+        2 // retries
+      );
+
       if (!headRes.ok) throw new Error('Failed to fetch head slot from beacon API');
       const headData = await headRes.json();
       const currentHeadSlot: number = Number(headData.data.header.message.slot);
@@ -254,7 +261,11 @@ export function useBeaconGraffiti() {
             newSlots,
             async (slot, _index, fetchSignal) => {
               try {
-                const res = await fetch(`${BEACON_API}/eth/v2/beacon/blocks/${slot}`, { signal: fetchSignal });
+                const res = await fetchWithRetry(
+                  `${BEACON_API}/eth/v2/beacon/blocks/${slot}`,
+                  { signal: fetchSignal },
+                  1 // fewer retries for individual blocks
+                );
                 if (!res.ok) return null;
                 const block = await res.json();
                 const g = decodeGraffiti(block?.data?.message?.body?.graffiti);
@@ -286,7 +297,11 @@ export function useBeaconGraffiti() {
           slots,
           async (slot, _index, fetchSignal) => {
             try {
-              const res = await fetch(`${BEACON_API}/eth/v2/beacon/blocks/${slot}`, { signal: fetchSignal });
+              const res = await fetchWithRetry(
+                `${BEACON_API}/eth/v2/beacon/blocks/${slot}`,
+                { signal: fetchSignal },
+                1
+              );
               if (!res.ok) return null;
               const block = await res.json();
               const g = decodeGraffiti(block?.data?.message?.body?.graffiti);
@@ -338,7 +353,7 @@ export function useBeaconGraffiti() {
     if (!cached) return 0;
 
     try {
-      const headRes = await fetch(`${BEACON_API}/eth/v1/beacon/headers/head`);
+      const headRes = await fetchWithRetry(`${BEACON_API}/eth/v1/beacon/headers/head`, {}, 1);
       const headSlot = Number((await headRes.json()).data.header.message.slot);
       const delta = headSlot - cached.lastHeadSlot;
       const newDelta = Math.max(0, delta);
