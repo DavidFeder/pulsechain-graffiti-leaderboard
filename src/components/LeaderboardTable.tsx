@@ -19,7 +19,7 @@ export function LeaderboardTable({ entries }: Props) {
       // Gold
       return (
         <div
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 text-[11px] font-bold text-amber-950 shadow-inner ring-1 ring-yellow-400/60"
+          className="ml-1 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 text-[11px] font-bold text-amber-950 shadow-inner ring-1 ring-yellow-400/60"
           aria-label="1st place"
           title="1st place - Gold"
         >
@@ -31,7 +31,7 @@ export function LeaderboardTable({ entries }: Props) {
       // Silver
       return (
         <div
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400 text-[11px] font-bold text-slate-700 shadow-inner ring-1 ring-slate-300/60"
+          className="ml-1 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400 text-[11px] font-bold text-slate-700 shadow-inner ring-1 ring-slate-300/60"
           aria-label="2nd place"
           title="2nd place - Silver"
         >
@@ -43,7 +43,7 @@ export function LeaderboardTable({ entries }: Props) {
       // Bronze
       return (
         <div
-          className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-orange-300 via-amber-500 to-orange-700 text-[11px] font-bold text-amber-100 shadow-inner ring-1 ring-orange-400/60"
+          className="ml-1 flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-orange-300 via-amber-500 to-orange-700 text-[11px] font-bold text-amber-100 shadow-inner ring-1 ring-orange-400/60"
           aria-label="3rd place"
           title="3rd place - Bronze"
         >
@@ -59,7 +59,7 @@ export function LeaderboardTable({ entries }: Props) {
       <table className="leaderboard-table w-full text-sm">
         <thead>
           <tr>
-            <th className="w-28 pl-4">#</th>
+            <th className="w-32 pl-5">#</th>
             <th>GRAFFITI</th>
             <th className="w-24 text-right">COUNT</th>
             <th className="w-28 text-right">% OF BLOCKS</th>
@@ -68,7 +68,7 @@ export function LeaderboardTable({ entries }: Props) {
         <tbody>
           {entries.map((entry, index) => (
             <tr key={index}>
-              <td className="pl-4">
+              <td className="pl-5">
                 <div className="flex items-center gap-2">
                   {getMetalBadge(index) || (
                     <span className="font-mono text-zinc-500 pl-1">{index + 1}</span>
