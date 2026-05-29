@@ -15,12 +15,13 @@ export interface FetchResult {
   slotsWithGraffiti: number
   uniqueGraffiti: number
   loading: boolean
+  progress: number
   error: string | null
 }
 
 const BEACON_API = 'https://rpc-pulsechain.g4mm4.io/beacon-api'
 
-const CONCURRENCY = 18 // Balanced for public RPCs
+const CONCURRENCY = 18
 
 export function useBeaconGraffiti() {
   const [result, setResult] = useState<FetchResult>({
@@ -30,26 +31,34 @@ export function useBeaconGraffiti() {
     slotsWithGraffiti: 0,
     uniqueGraffiti: 0,
     loading: false,
+    progress: 0,
     error: null,
   })
 
   const load = useCallback(async (slotCount: number) => {
-    setResult(prev => ({ ...prev, loading: true, error: null }))
+    setResult(prev => ({ 
+      ...prev, 
+      loading: true, 
+      error: null, 
+      progress: 0,
+      totalSlotsRequested: slotCount,
+    }))
 
     try {
       // 1. Get current head slot
       const headRes = await fetch(`${BEACON_API}/eth/v1/beacon/headers/head`)
-      if (!headRes.ok) throw new Error('Failed to fetch head slot')
+      if (!headRes.ok) throw new Error('Failed to fetch head slot from beacon API')
       const headData = await headRes.json()
       const headSlot: number = Number(headData.data.header.message.slot)
 
       const slots = Array.from({ length: slotCount }, (_, i) => headSlot - i)
 
-      // 2. Fetch blocks with concurrency limit
-      let fetched = 0
+      let completed = 0
+
+      // 2. Fetch with concurrency + live progress
       const rawResults = await fetchWithConcurrencyLimit(
         slots,
-        async (slot, idx) => {
+        async (slot) => {
           try {
             const res = await fetch(`${BEACON_API}/eth/v2/beacon/blocks/${slot}`)
             if (!res.ok) return null
@@ -58,11 +67,15 @@ export function useBeaconGraffiti() {
             const graffitiHex = block?.data?.message?.body?.graffiti
             const graffiti = decodeGraffiti(graffitiHex)
 
-            fetched++
-            // Optional: you could expose progress here via another state
+            completed++
+            const newProgress = Math.round((completed / slotCount) * 100)
+            setResult(prev => ({ ...prev, progress: newProgress }))
 
             return { slot, graffiti }
           } catch {
+            completed++
+            const newProgress = Math.round((completed / slotCount) * 100)
+            setResult(prev => ({ ...prev, progress: newProgress }))
             return null
           }
         },
@@ -84,7 +97,6 @@ export function useBeaconGraffiti() {
         }
       }
 
-      // 4. Build sorted leaderboard
       const sorted = Array.from(counts.entries())
         .map(([graffiti, count]) => ({
           graffiti,
@@ -100,13 +112,14 @@ export function useBeaconGraffiti() {
         slotsWithGraffiti: withGraffiti,
         uniqueGraffiti: sorted.length,
         loading: false,
+        progress: 100,
         error: null,
       })
     } catch (err: any) {
       setResult(prev => ({
         ...prev,
         loading: false,
-        error: err.message || 'Failed to load graffiti data',
+        error: err.message || 'Failed to load beacon graffiti data',
       }))
     }
   }, [])

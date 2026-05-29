@@ -53,7 +53,7 @@ function App() {
                 className="w-28 bg-black border border-zinc-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500"
               />
             </div>
-            <div className="text-[10px] text-zinc-500 mt-1">Higher = slower first load (beacon blocks are heavy)</div>
+            <div className="text-[10px] text-zinc-500 mt-1">Higher = slower (real beacon blocks are heavy to fetch)</div>
           </div>
 
           <button
@@ -62,7 +62,7 @@ function App() {
             className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:bg-zinc-800 text-black disabled:text-zinc-400 font-medium px-6 py-2.5 rounded text-sm transition-colors"
           >
             {result.loading ? (
-              <>Loading...</>
+              <>Fetching... {result.progress}%</>
             ) : (
               <>
                 <RefreshCw className="w-4 h-4" /> Load / Refresh Leaderboard
@@ -78,21 +78,30 @@ function App() {
           </div>
         )}
 
-        {result.loading && result.totalSlotsRequested > 0 && (
-          <div className="mb-6 text-sm text-zinc-400">
-            Fetching beacon blocks... this can take 20–60 seconds depending on the range.
+        {/* Live progress bar */}
+        {result.loading && (
+          <div className="mb-6">
+            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+              <div 
+                className="h-1.5 bg-emerald-500 transition-all duration-200" 
+                style={{ width: `${result.progress}%` }} 
+              />
+            </div>
+            <div className="text-xs text-zinc-500 mt-1.5">
+              Fetching beacon blocks — {result.progress}% complete. This is expected to be slow for correctness.
+            </div>
           </div>
         )}
 
         {/* Results */}
-        {(result.entries.length > 0 || result.totalSlotsFetched > 0) && (
+        {(result.entries.length > 0 || result.totalSlotsFetched > 0) && !result.loading && (
           <>
             <StatsCards result={result} />
 
             <div className="mb-3 flex items-baseline justify-between">
-              <div className="text-sm font-medium text-zinc-300">Top Graffiti</div>
+              <div className="text-sm font-medium text-zinc-300">Top Graffiti (real beacon data)</div>
               <div className="text-xs text-zinc-500">
-                Sorted by frequency • Only non-empty graffiti shown
+                Sorted by frequency • Empty graffiti filtered
               </div>
             </div>
 
@@ -102,14 +111,14 @@ function App() {
 
         {!result.loading && result.entries.length === 0 && result.totalSlotsRequested === 0 && (
           <div className="text-center py-16 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
-            Click <span className="font-medium text-zinc-400">"Load / Refresh Leaderboard"</span> to start.
-            <div className="text-xs mt-2">Recommended starting point: 300 slots (~50 minutes of history)</div>
+            Click <span className="font-medium text-zinc-400">"Load / Refresh Leaderboard"</span> above to fetch real validator graffiti.
+            <div className="text-xs mt-2 max-w-xs mx-auto">Start with 100–300 slots. 500+ will take noticeably longer on public endpoints.</div>
           </div>
         )}
 
         <div className="mt-12 text-[10px] text-zinc-600 leading-relaxed max-w-2xl">
-          Note: Fetching full beacon blocks for graffiti is intentionally slow on public endpoints.
-          This is the price of correctness (real validator-set graffiti). Future versions will add caching, workers, and smarter incremental updates.
+          This MVP prioritizes correctness: we fetch the actual <code className="text-emerald-400">body.graffiti</code> field from beacon blocks (the 32 bytes validators set with <code>--graffiti</code> in their client).
+          This is deliberately slower than reading execution <code>extraData</code>.
         </div>
       </div>
     </div>
