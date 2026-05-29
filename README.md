@@ -29,7 +29,7 @@ npm run dev
 1. Install **Node.js** (LTS version recommended) from [nodejs.org](https://nodejs.org/en/download/)
 2. Install **Git for Windows** from [git-scm.com](https://git-scm.com/download/win)
 
-> **Important**: After installing Node.js, completely close and reopen any terminals or PowerShell windows.
+> **Important**: After installing Node.js, **completely close and reopen** any terminals or PowerShell windows. This is the #1 reason `npm` is "not recognized" even after a successful install.
 
 #### Step-by-step Instructions
 
@@ -63,9 +63,20 @@ npm run dev
 
 #### Common Windows Gotchas & Fixes
 
-- **"'npm' is not recognized"**: You must restart your terminal after installing Node.js.
+- **"'npm' is not recognized"** (most common issue):
+  - You **must** close the current PowerShell window completely and open a **brand new** one after installing Node.js.
+  - This happens even when winget or the installer says "Successfully installed".
+  - Example: User ran `winget install OpenJS.NodeJS.LTS`, saw "Successfully installed", then immediately ran `npm install` in the **same** terminal → error.
+  - **Fix**: Close PowerShell → open it again → try `node --version` and `npm --version`.
+
+- **Using `&&` between commands fails**:
+  - Old Windows PowerShell (the default `PS` prompt) does not support `&&`.
+  - Use two separate lines instead, or upgrade to modern PowerShell 7.
+
 - **Port 5173 already in use**: Vite will automatically offer you another port (e.g. 5174).
+
 - **Slow first `npm install`**: Normal on Windows. Subsequent installs are much faster.
+
 - **Antivirus / Windows Defender** flagging something: This is rare with Vite projects. You can usually ignore it.
 
 ### Architecture Notes
