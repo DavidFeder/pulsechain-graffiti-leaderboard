@@ -3,6 +3,7 @@ import { useBeaconGraffiti } from './hooks/useBeaconGraffiti'
 import { StatsCards } from './components/StatsCards'
 import { LeaderboardTable } from './components/LeaderboardTable'
 import { PulseChainLogo } from './components/PulseChainLogo'
+import ErrorBoundary from './components/ErrorBoundary'
 import { RefreshCw, AlertCircle, Database, Cpu } from 'lucide-react'
 
 function formatRelativeTime(timestamp: number | null): string {
@@ -42,153 +43,155 @@ function App() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#ededed]">
       <div className="max-w-5xl mx-auto px-6 py-10">
-        {/* Header with Logo */}
-        <div className="mb-10">
-          <div className="flex items-center gap-4 mb-2">
-            <PulseChainLogo size={48} className="drop-shadow-[0_0_8px_rgba(255,0,170,0.4)]" />
-            <div>
-              <div className="flex items-center gap-3">
-                <div className="text-4xl font-bold tracking-tighter">PulseChain</div>
-                <div className="text-4xl font-bold tracking-tighter bg-gradient-to-r from-[#00D4FF] via-[#A855F7] to-[#FF00AA] bg-clip-text text-transparent">
-                  Graffiti Leaderboard
+        <ErrorBoundary>
+          {/* Header with Logo */}
+          <div className="mb-10">
+            <div className="flex items-center gap-4 mb-2">
+              <PulseChainLogo size={48} className="drop-shadow-[0_0_8px_rgba(255,0,170,0.4)]" />
+              <div>
+                <div className="flex items-center gap-3">
+                  <div className="text-4xl font-bold tracking-tighter">PulseChain</div>
+                  <div className="text-4xl font-bold tracking-tighter bg-gradient-to-r from-[#00D4FF] via-[#A855F7] to-[#FF00AA] bg-clip-text text-transparent">
+                    Graffiti Leaderboard
+                  </div>
                 </div>
               </div>
             </div>
+
+            <p className="text-lg text-zinc-400 max-w-2xl">
+              Real beacon chain graffiti from the last <span className="font-mono">{slotCount}</span> slots.
+            </p>
           </div>
 
-          <p className="text-lg text-zinc-400 max-w-2xl">
-            Real beacon chain graffiti from the last <span className="font-mono">{slotCount}</span> slots.
-          </p>
-        </div>
-
-        {/* Cache status */}
-        {result.isFromCache && result.cachedAt && (
-          <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm">
-            <div className="flex items-center gap-2 text-[#FF00AA]">
-              <Database className="h-4 w-4" />
-              <span>Loaded from cache</span>
-            </div>
-            <div className="text-zinc-400">
-              Last synced {formatRelativeTime(result.cachedAt)} • up to slot {result.lastHeadSlot?.toLocaleString()}
-            </div>
-            {result.newSlotsAvailable > 0 && (
-              <div className="ml-auto rounded bg-[#FF00AA]/10 px-3 py-1 text-xs font-medium text-[#FF00AA]">
-                {result.newSlotsAvailable} new slots since last visit
+          {/* Cache status */}
+          {result.isFromCache && result.cachedAt && (
+            <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm">
+              <div className="flex items-center gap-2 text-[#FF00AA]">
+                <Database className="h-4 w-4" />
+                <span>Loaded from cache</span>
               </div>
-            )}
-          </div>
-        )}
-
-        {/* Controls */}
-        <div className="flex flex-wrap items-end gap-4 mb-6">
-          <div>
-            <label className="block text-xs text-zinc-500 mb-1.5">SLOTS TO ANALYZE</label>
-            <div className="flex gap-2">
-              {[100, 300, 500].map(n => (
-                <button
-                  key={n}
-                  onClick={() => setSlotCount(n)}
-                  className={`px-4 py-2 text-sm rounded border transition-colors ${slotCount === n 
-                    ? 'bg-white text-black border-white' 
-                    : 'border-zinc-700 hover:bg-zinc-900'}`}
-                >
-                  {n}
-                </button>
-              ))}
-              <input
-                type="number"
-                value={slotCount}
-                onChange={(e) => setSlotCount(Math.max(50, Math.min(2000, Number(e.target.value) || 300)))}
-                className="w-28 bg-black border border-zinc-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#FF00AA]"
-              />
-            </div>
-            <div className="text-[10px] text-zinc-500 mt-1">Higher = slower first load</div>
-          </div>
-
-          <div className="flex gap-2">
-            <button
-              onClick={() => handleLoad(false)}
-              disabled={result.loading}
-              className="flex items-center gap-2 text-white font-medium px-5 py-2.5 rounded text-sm transition-all disabled:bg-zinc-800 disabled:text-zinc-400 disabled:bg-none disabled:cursor-not-allowed"
-              style={{
-                background: 'linear-gradient(to right, #00D4FF, #FF00AA)'
-              }}
-            >
-              {result.loading ? (
-                <>{loadingMessage}</>
-              ) : (
-                <>
-                  <RefreshCw className="w-4 h-4" /> 
-                  {result.isFromCache ? 'Update with latest blocks' : 'Load Leaderboard'}
-                </>
+              <div className="text-zinc-400">
+                Last synced {formatRelativeTime(result.cachedAt)} • up to slot {result.lastHeadSlot?.toLocaleString()}
+              </div>
+              {result.newSlotsAvailable > 0 && (
+                <div className="ml-auto rounded bg-[#FF00AA]/10 px-3 py-1 text-xs font-medium text-[#FF00AA]">
+                  {result.newSlotsAvailable} new slots since last visit
+                </div>
               )}
-            </button>
+            </div>
+          )}
 
-            {result.isFromCache && (
+          {/* Controls */}
+          <div className="flex flex-wrap items-end gap-4 mb-6">
+            <div>
+              <label className="block text-xs text-zinc-500 mb-1.5">SLOTS TO ANALYZE</label>
+              <div className="flex gap-2">
+                {[100, 300, 500].map(n => (
+                  <button
+                    key={n}
+                    onClick={() => setSlotCount(n)}
+                    className={`px-4 py-2 text-sm rounded border transition-colors ${slotCount === n 
+                      ? 'bg-white text-black border-white' 
+                      : 'border-zinc-700 hover:bg-zinc-900'}`}
+                  >
+                    {n}
+                  </button>
+                ))}
+                <input
+                  type="number"
+                  value={slotCount}
+                  onChange={(e) => setSlotCount(Math.max(50, Math.min(2000, Number(e.target.value) || 300)))}
+                  className="w-28 bg-black border border-zinc-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#FF00AA]"
+                />
+              </div>
+              <div className="text-[10px] text-zinc-500 mt-1">Higher = slower first load</div>
+            </div>
+
+            <div className="flex gap-2">
               <button
-                onClick={() => handleLoad(true)}
+                onClick={() => handleLoad(false)}
                 disabled={result.loading}
-                className="flex items-center gap-2 border border-zinc-700 hover:bg-zinc-900 px-4 py-2.5 rounded text-sm transition-colors"
+                className="flex items-center gap-2 text-white font-medium px-5 py-2.5 rounded text-sm transition-all disabled:bg-zinc-800 disabled:text-zinc-400 disabled:bg-none disabled:cursor-not-allowed"
+                style={{
+                  background: 'linear-gradient(to right, #00D4FF, #FF00AA)'
+                }}
               >
-                Full refresh
+                {result.loading ? (
+                  <>{loadingMessage}</>
+                ) : (
+                  <>
+                    <RefreshCw className="w-4 h-4" /> 
+                    {result.isFromCache ? 'Update with latest blocks' : 'Load Leaderboard'}
+                  </>
+                )}
               </button>
-            )}
 
-            {result.cachedAt && (
-              <button
-                onClick={clearCache}
-                className="flex items-center gap-2 border border-zinc-800 hover:bg-zinc-950 px-3 py-2.5 rounded text-sm text-zinc-400 transition-colors"
-              >
-                Clear cache
-              </button>
-            )}
-          </div>
-        </div>
+              {result.isFromCache && (
+                <button
+                  onClick={() => handleLoad(true)}
+                  disabled={result.loading}
+                  className="flex items-center gap-2 border border-zinc-700 hover:bg-zinc-900 px-4 py-2.5 rounded text-sm transition-colors"
+                >
+                  Full refresh
+                </button>
+              )}
 
-        {result.error && (
-          <div className="flex items-center gap-2 bg-red-950 border border-red-900 text-red-400 px-4 py-3 rounded mb-6 text-sm">
-            <AlertCircle className="w-4 h-4" />
-            {result.error}
-          </div>
-        )}
-
-        {/* Progress */}
-        {result.loading && (
-          <div className="mb-6">
-            <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-              <div 
-                className="h-1.5 bg-gradient-to-r from-[#00D4FF] to-[#FF00AA] transition-all duration-200" 
-                style={{ width: `${result.progress}%` }} 
-              />
-            </div>
-            <div className="text-xs text-zinc-500 mt-1.5 flex items-center gap-2">
-              <Cpu className="w-3 h-3" />
-              {loadingMessage} — running in background worker
+              {result.cachedAt && (
+                <button
+                  onClick={clearCache}
+                  className="flex items-center gap-2 border border-zinc-800 hover:bg-zinc-950 px-3 py-2.5 rounded text-sm text-zinc-400 transition-colors"
+                >
+                  Clear cache
+                </button>
+              )}
             </div>
           </div>
-        )}
 
-        {(result.entries.length > 0 || result.totalSlotsFetched > 0) && !result.loading && (
-          <>
-            <StatsCards result={result} />
+          {result.error && (
+            <div className="flex items-center gap-2 bg-red-950 border border-red-900 text-red-400 px-4 py-3 rounded mb-6 text-sm">
+              <AlertCircle className="w-4 h-4" />
+              {result.error}
+            </div>
+          )}
 
-            <div className="mb-3 flex items-baseline justify-between">
-              <div className="text-sm font-medium text-zinc-300">Top Graffiti (real beacon data)</div>
-              <div className="text-xs text-zinc-500">
-                Sorted by frequency • Empty graffiti filtered
+          {/* Progress */}
+          {result.loading && (
+            <div className="mb-6">
+              <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
+                <div 
+                  className="h-1.5 bg-gradient-to-r from-[#00D4FF] to-[#FF00AA] transition-all duration-200" 
+                  style={{ width: `${result.progress}%` }} 
+                />
+              </div>
+              <div className="text-xs text-zinc-500 mt-1.5 flex items-center gap-2">
+                <Cpu className="w-3 h-3" />
+                {loadingMessage} — running in background worker
               </div>
             </div>
+          )}
 
-            <LeaderboardTable entries={result.entries} />
-          </>
-        )}
+          {(result.entries.length > 0 || result.totalSlotsFetched > 0) && !result.loading && (
+            <>
+              <StatsCards result={result} />
 
-        {!result.loading && result.entries.length === 0 && result.totalSlotsRequested === 0 && (
-          <div className="text-center py-16 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
-            Click <span className="font-medium text-zinc-400">"Load Leaderboard"</span> above.
-            <div className="text-xs mt-2">Returning visitors get instant results thanks to localStorage + Web Worker aggregation.</div>
-          </div>
-        )}
+              <div className="mb-3 flex items-baseline justify-between">
+                <div className="text-sm font-medium text-zinc-300">Top Graffiti (real beacon data)</div>
+                <div className="text-xs text-zinc-500">
+                  Sorted by frequency • Empty graffiti filtered
+                </div>
+              </div>
+
+              <LeaderboardTable entries={result.entries} />
+            </>
+          )}
+
+          {!result.loading && result.entries.length === 0 && result.totalSlotsRequested === 0 && (
+            <div className="text-center py-16 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
+              Click <span className="font-medium text-zinc-400">"Load Leaderboard"</span> above.
+              <div className="text-xs mt-2">Returning visitors get instant results thanks to localStorage + Web Worker aggregation.</div>
+            </div>
+          )}
+        </ErrorBoundary>
       </div>
     </div>
   )
