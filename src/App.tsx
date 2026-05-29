@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useBeaconGraffiti } from './hooks/useBeaconGraffiti'
 import { StatsCards } from './components/StatsCards'
 import { LeaderboardTable } from './components/LeaderboardTable'
-import { RefreshCw, AlertCircle, Database, Clock } from 'lucide-react'
+import { RefreshCw, AlertCircle, Database, Clock, Cpu } from 'lucide-react'
 
 function formatRelativeTime(timestamp: number | null): string {
   if (!timestamp) return ''
@@ -18,7 +18,6 @@ function App() {
   const { result, load, checkForUpdates, clearCache } = useBeaconGraffiti()
   const [slotCount, setSlotCount] = useState(300)
 
-  // On mount, after hydration, check how many new slots exist
   useEffect(() => {
     if (result.lastHeadSlot) {
       checkForUpdates()
@@ -30,14 +29,19 @@ function App() {
   }
 
   const handleQuickUpdate = async () => {
-    // Fast path: only fetch new blocks since cache
     await load(slotCount, false)
   }
+
+  // Determine the loading message
+  const loadingMessage = result.loading
+    ? result.progress < 100 && result.progress > 0
+      ? `Fetching new blocks... ${result.progress}%`
+      : 'Aggregating graffiti data in background...'
+    : ''
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#ededed]">
       <div className="max-w-5xl mx-auto px-6 py-10">
-        {/* Header */}
         <div className="mb-10">
           <div className="flex items-center gap-3 mb-2">
             <div className="text-4xl font-bold tracking-tighter">PulseChain</div>
@@ -48,11 +52,11 @@ function App() {
             <span className="text-zinc-500">Pure client-side. No backend.</span>
           </p>
           <p className="text-xs text-zinc-500 mt-1">
-            Data source: rpc-pulsechain.g4mm4.io beacon API • Only the real 32-byte graffiti validators set on their nodes
+            Data source: rpc-pulsechain.g4mm4.io beacon API • Only the real 32-byte graffiti field validators set on their nodes
           </p>
         </div>
 
-        {/* Cache status for returning visitors */}
+        {/* Cache status */}
         {result.isFromCache && result.cachedAt && (
           <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm">
             <div className="flex items-center gap-2 text-emerald-400">
@@ -103,7 +107,7 @@ function App() {
               className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:bg-zinc-800 text-black disabled:text-zinc-400 font-medium px-5 py-2.5 rounded text-sm transition-colors"
             >
               {result.loading ? (
-                <>Updating... {result.progress}%</>
+                <>{loadingMessage}</>
               ) : (
                 <>
                   <RefreshCw className="w-4 h-4" /> 
@@ -140,7 +144,7 @@ function App() {
           </div>
         )}
 
-        {/* Live progress bar */}
+        {/* Progress */}
         {result.loading && (
           <div className="mb-6">
             <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
@@ -149,13 +153,13 @@ function App() {
                 style={{ width: `${result.progress}%` }} 
               />
             </div>
-            <div className="text-xs text-zinc-500 mt-1.5">
-              {result.isFromCache ? 'Fetching only new blocks since your last visit...' : 'Fetching beacon blocks...'}
+            <div className="text-xs text-zinc-500 mt-1.5 flex items-center gap-2">
+              <Cpu className="w-3 h-3" />
+              {loadingMessage} — running in background worker
             </div>
           </div>
         )}
 
-        {/* Results */}
         {(result.entries.length > 0 || result.totalSlotsFetched > 0) && !result.loading && (
           <>
             <StatsCards result={result} />
@@ -173,14 +177,13 @@ function App() {
 
         {!result.loading && result.entries.length === 0 && result.totalSlotsRequested === 0 && (
           <div className="text-center py-16 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
-            Click <span className="font-medium text-zinc-400">"Load Leaderboard"</span> to start.
-            <div className="text-xs mt-2">Returning visitors get instant results from cache (blockchain data never goes stale).
-            </div>
+            Click <span className="font-medium text-zinc-400">"Load Leaderboard"</span> above.
+            <div className="text-xs mt-2">Returning visitors get instant results thanks to localStorage + Web Worker aggregation.</div>
           </div>
         )}
 
         <div className="mt-12 text-[10px] text-zinc-600 leading-relaxed max-w-2xl">
-          Because this is immutable blockchain history, cached results stay valid. We only fetch the new slots since your last visit for near-instant updates.
+          Aggregation now runs in a Web Worker. Cache hits are near-instant even on slower devices.
         </div>
       </div>
     </div>

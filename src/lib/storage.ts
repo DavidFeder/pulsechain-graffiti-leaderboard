@@ -2,7 +2,7 @@ import type { CachedWindow } from '../hooks/useBeaconGraffiti'
 
 const STORAGE_KEY = 'pls-graffiti-leaderboard-v1'
 
-const MAX_AGE_MS = 1000 * 60 * 60 * 6 // 6 hours - after this we still show data but encourage refresh
+const MAX_AGE_MS = 1000 * 60 * 60 * 6
 
 export function saveCachedWindow(data: CachedWindow): void {
   try {
@@ -16,14 +16,10 @@ export function loadCachedWindow(): CachedWindow | null {
   try {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
-
     const parsed = JSON.parse(raw) as CachedWindow
-
-    // Basic validation
     if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.records)) {
       return null
     }
-
     return parsed
   } catch {
     return null
@@ -35,7 +31,6 @@ export function clearCachedWindow(): void {
     localStorage.removeItem(STORAGE_KEY)
   } catch {}
 }
-
 export function isCacheStale(cachedAt: number): boolean {
   return Date.now() - cachedAt > MAX_AGE_MS
 }

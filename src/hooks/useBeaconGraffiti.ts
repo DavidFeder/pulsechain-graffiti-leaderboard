@@ -1,7 +1,11 @@
-import { useState, useCallback, useEffect } from 'react'
+import { useState, useCallback, useEffect, useRef } from 'react'
 import { decodeGraffiti, isEmptyGraffiti } from '../lib/decodeGraffiti'
 import { fetchWithConcurrencyLimit } from '../utils/concurrency'
-import { saveCachedWindow, loadCachedWindow, clearCachedWindow, isCacheStale } from '../lib/storage'
+import { saveCachedWindow, loadCachedWindow, clearCachedWindow } from '../lib/storage'
+import type { WorkerRecord, WorkerResult } from '../workers/graffitiAggregator.worker'
+
+// Re-export for App.tsx convenience
+export type { CachedWindow } from '../lib/storage'
 
 export interface GraffitiEntry {
   graffiti: string
@@ -18,7 +22,6 @@ export interface FetchResult {
   loading: boolean
   progress: number
   error: string | null
-  // New cache-aware fields
   isFromCache: boolean
   cachedAt: number | null
   lastHeadSlot: number | null
@@ -34,10 +37,37 @@ export interface CachedWindow {
 }
 
 const BEACON_API = 'https://rpc-pulsechain.g4mm4.io/beacon-api'
-
 const CONCURRENCY = 18
 
-function aggregateFromRecords(records: Array<{ slot: number; graffiti: string }>) {
+// Lightweight pre-computed result for truly instant paint on returning visits
+const QUICK_CACHE_KEY = 'pls-graffiti-quick-v1'
+
+function saveQuickResult(data: {
+  entries: GraffitiEntry[]
+  totalSlotsRequested: number
+  cachedAt: number
+  lastHeadSlot: number
+}) {
+  try {
+    localStorage.setItem(QUICK_CACHE_KEY, JSON.stringify(data))
+  } catch {}
+}
+
+function loadQuickResult() {
+  try {
+    const raw = localStorage.getItem(QUICK_CACHE_KEY)
+    return raw ? JSON.parse(raw) : null
+  } catch {
+    return null
+  }
+}
+
+function clearQuickResult() {
+  try { localStorage.removeItem(QUICK_CACHE_KEY) } catch {}
+}
+
+// Helper to turn raw records into the UI shape (used as fallback)
+function aggregateInMain(records: Array<{ slot: number; graffiti: string }>) {
   const counts = new Map<string, number>()
   let withGraffiti = 0
 
@@ -65,40 +95,159 @@ function aggregateFromRecords(records: Array<{ slot: number; graffiti: string }>
 }
 
 export function useBeaconGraffiti() {
-  const [result, setResult] = useState<FetchResult>({
-    entries: [],
-    totalSlotsRequested: 0,
-    totalSlotsFetched: 0,
-    slotsWithGraffiti: 0,
-    uniqueGraffiti: 0,
-    loading: false,
-    progress: 0,
-    error: null,
-    isFromCache: false,
-    cachedAt: null,
-    lastHeadSlot: null,
-    newSlotsAvailable: 0,
-  })
-
-  // Hydrate from localStorage instantly on mount
-  useEffect(() => {
-    const cached = loadCachedWindow()
-    if (cached && cached.records.length > 0) {
-      const agg = aggregateFromRecords(cached.records)
-
-      setResult({
-        ...agg,
-        totalSlotsRequested: cached.windowSize,
+  const [result, setResult] = useState<FetchResult>(() => {
+    // Synchronous initial state from the lightweight quick cache (zero jank)
+    const quick = loadQuickResult()
+    if (quick) {
+      return {
+        entries: quick.entries,
+        totalSlotsRequested: quick.totalSlotsRequested,
+        totalSlotsFetched: quick.entries.length > 0 ? quick.totalSlotsRequested : 0, // approximate
+        slotsWithGraffiti: 0,
+        uniqueGraffiti: quick.entries.length,
         loading: false,
         progress: 100,
         error: null,
         isFromCache: true,
-        cachedAt: cached.cachedAt,
-        lastHeadSlot: cached.lastHeadSlot,
-        newSlotsAvailable: 0, // will be calculated on first refresh
-      })
+        cachedAt: quick.cachedAt,
+        lastHeadSlot: quick.lastHeadSlot,
+        newSlotsAvailable: 0,
+      }
+    }
+    return {
+      entries: [],
+      totalSlotsRequested: 0,
+      totalSlotsFetched: 0,
+      slotsWithGraffiti: 0,
+      uniqueGraffiti: 0,
+      loading: false,
+      progress: 0,
+      error: null,
+      isFromCache: false,
+      cachedAt: null,
+      lastHeadSlot: null,
+      newSlotsAvailable: 0,
+    }
+  })
+
+  const workerRef = useRef<Worker | null>(null)
+
+  // Initialize Web Worker once
+  useEffect(() => {
+    // Vite-specific worker import
+    const worker = new Worker(
+      new URL('../workers/graffitiAggregator.worker.ts', import.meta.url),
+      { type: 'module' }
+    )
+    workerRef.current = worker
+
+    worker.onmessage = (event: MessageEvent) => {
+      const { type, result, error } = event.data
+
+      if (type === 'AGGREGATE_RESULT' && result) {
+        const workerResult = result as WorkerResult
+
+        setResult(prev => {
+          const newState = {
+            ...prev,
+            entries: workerResult.entries,
+            totalSlotsFetched: workerResult.totalSlotsFetched,
+            slotsWithGraffiti: workerResult.slotsWithGraffiti,
+            uniqueGraffiti: workerResult.uniqueGraffiti,
+            loading: false,
+            progress: 100,
+            error: null,
+            isFromCache: false, // fresh computation
+          }
+
+          // Also update the quick cache for next instant load
+          if (prev.lastHeadSlot && prev.totalSlotsRequested) {
+            saveQuickResult({
+              entries: workerResult.entries,
+              totalSlotsRequested: prev.totalSlotsRequested,
+              cachedAt: Date.now(),
+              lastHeadSlot: prev.lastHeadSlot,
+            })
+          }
+
+          return newState
+        })
+      }
+
+      if (type === 'ERROR') {
+        setResult(prev => ({
+          ...prev,
+          loading: false,
+          error: error || 'Worker aggregation failed',
+        }))
+      }
+    }
+
+    worker.onerror = (err) => {
+      console.error('Graffiti worker error:', err)
+      setResult(prev => ({
+        ...prev,
+        loading: false,
+        error: 'Aggregation worker crashed',
+      }))
+    }
+
+    return () => {
+      worker.terminate()
+      workerRef.current = null
     }
   }, [])
+
+  // Function to send records to worker for aggregation
+  const aggregateViaWorker = useCallback((records: Array<{ slot: number; graffiti: string }>, meta: {
+    totalSlotsRequested: number
+    lastHeadSlot: number
+    cachedAt?: number
+  }) => {
+    const worker = workerRef.current
+    if (!worker) {
+      // Fallback to main thread if worker not ready
+      const agg = aggregateInMain(records)
+      setResult(prev => ({
+        ...prev,
+        ...agg,
+        totalSlotsRequested: meta.totalSlotsRequested,
+        loading: false,
+        progress: 100,
+        lastHeadSlot: meta.lastHeadSlot,
+        cachedAt: meta.cachedAt ?? Date.now(),
+      }))
+      return
+    }
+
+    setResult(prev => ({
+      ...prev,
+      loading: true,
+      progress: 0,
+      totalSlotsRequested: meta.totalSlotsRequested,
+      lastHeadSlot: meta.lastHeadSlot,
+    }))
+
+    // Send work to the worker thread
+    worker.postMessage({
+      type: 'AGGREGATE',
+      records: records as WorkerRecord[],
+    })
+  }, [])
+
+  // Hydrate from localStorage + kick off worker (non-blocking)
+  useEffect(() => {
+    const cached = loadCachedWindow()
+    if (cached && cached.records.length > 0) {
+      // Show the quick pre-computed result immediately (from constructor above)
+      // Then send raw records to worker for fresh, accurate aggregation
+      aggregateViaWorker(cached.records, {
+        totalSlotsRequested: cached.windowSize,
+        lastHeadSlot: cached.lastHeadSlot,
+        cachedAt: cached.cachedAt,
+      })
+    }
+  }, [aggregateViaWorker])
 
   const load = useCallback(async (slotCount: number, forceFullRefresh = false) => {
     setResult(prev => ({
@@ -111,27 +260,23 @@ export function useBeaconGraffiti() {
     }))
 
     try {
-      // Get current head
       const headRes = await fetch(`${BEACON_API}/eth/v1/beacon/headers/head`)
-      if (!headRes.ok) throw new Error('Failed to fetch head slot')
+      if (!headRes.ok) throw new Error('Failed to fetch head slot from beacon API')
       const headData = await headRes.json()
       const currentHeadSlot: number = Number(headData.data.header.message.slot)
 
       const cached = !forceFullRefresh ? loadCachedWindow() : null
-
       let records: Array<{ slot: number; graffiti: string }> = []
-      let startSlot = currentHeadSlot - slotCount + 1
 
       if (cached && cached.records.length > 0 && cached.windowSize === slotCount) {
-        // === SMART INCREMENTAL UPDATE ===
+        // Incremental update (same as before)
         const lastKnown = cached.lastHeadSlot
         const delta = currentHeadSlot - lastKnown
 
         if (delta > 0) {
-          // Fetch only the new slots
           const newSlots = Array.from({ length: delta }, (_, i) => lastKnown + 1 + i)
-
           let completed = 0
+
           const newRecords = await fetchWithConcurrencyLimit(
             newSlots,
             async (slot) => {
@@ -152,19 +297,17 @@ export function useBeaconGraffiti() {
             CONCURRENCY
           )
 
-          // Merge: drop old slots that fall outside the new window, append new ones
           const cutoffSlot = currentHeadSlot - slotCount + 1
           const survivingOld = cached.records.filter(r => r.slot >= cutoffSlot)
           records = [...survivingOld, ...newRecords.filter(Boolean) as any]
         } else {
-          // No new blocks - just use cache
           records = cached.records
         }
       } else {
-        // === FULL FETCH (first time or window size changed) ===
+        // Full fetch
         const slots = Array.from({ length: slotCount }, (_, i) => currentHeadSlot - i)
-
         let completed = 0
+
         const fetched = await fetchWithConcurrencyLimit(
           slots,
           async (slot) => {
@@ -187,13 +330,11 @@ export function useBeaconGraffiti() {
         records = fetched.filter(Boolean) as any
       }
 
-      // Trim to exact window size (in case of reorgs or weirdness)
+      // Trim window
       const cutoff = currentHeadSlot - slotCount + 1
       records = records.filter(r => r.slot >= cutoff).slice(-slotCount)
 
-      const agg = aggregateFromRecords(records)
-
-      // Persist the new window
+      // Save raw window
       const toCache: CachedWindow = {
         version: 1,
         windowSize: slotCount,
@@ -203,16 +344,11 @@ export function useBeaconGraffiti() {
       }
       saveCachedWindow(toCache)
 
-      setResult({
-        ...agg,
+      // Send to worker for aggregation (non-blocking)
+      aggregateViaWorker(records, {
         totalSlotsRequested: slotCount,
-        loading: false,
-        progress: 100,
-        error: null,
-        isFromCache: false,
-        cachedAt: toCache.cachedAt,
         lastHeadSlot: currentHeadSlot,
-        newSlotsAvailable: 0,
+        cachedAt: toCache.cachedAt,
       })
     } catch (err: any) {
       setResult(prev => ({
@@ -221,9 +357,8 @@ export function useBeaconGraffiti() {
         error: err.message || 'Failed to load graffiti data',
       }))
     }
-  }, [])
+  }, [aggregateViaWorker])
 
-  // Check how many new slots exist compared to cache (cheap head-only call)
   const checkForUpdates = useCallback(async () => {
     const cached = loadCachedWindow()
     if (!cached) return 0
@@ -234,11 +369,7 @@ export function useBeaconGraffiti() {
       const delta = headSlot - cached.lastHeadSlot
       const newDelta = Math.max(0, delta)
 
-      setResult(prev => ({
-        ...prev,
-        newSlotsAvailable: newDelta,
-      }))
-
+      setResult(prev => ({ ...prev, newSlotsAvailable: newDelta }))
       return newDelta
     } catch {
       return 0
@@ -247,6 +378,7 @@ export function useBeaconGraffiti() {
 
   const clearCache = useCallback(() => {
     clearCachedWindow()
+    clearQuickResult()
     setResult({
       entries: [],
       totalSlotsRequested: 0,
