@@ -57,11 +57,7 @@ function App() {
           </div>
 
           <p className="text-lg text-zinc-400 max-w-2xl">
-            Real beacon chain graffiti from the last <span className="font-mono">{slotCount}</span> slots.{' '}
-            <span className="text-zinc-500">Pure client-side. No backend.</span>
-          </p>
-          <p className="text-xs text-zinc-500 mt-1">
-            Data source: rpc-pulsechain.g4mm4.io beacon API • Only the real 32-byte graffiti field validators set on their nodes
+            Real beacon chain graffiti from the last <span className="font-mono">{slotCount}</span> slots.
           </p>
         </div>
 
@@ -193,10 +189,6 @@ function App() {
             <div className="text-xs mt-2">Returning visitors get instant results thanks to localStorage + Web Worker aggregation.</div>
           </div>
         )}
-
-        <div className="mt-12 text-[10px] text-zinc-600 leading-relaxed max-w-2xl">
-          Aggregation now runs in a Web Worker. Cache hits are near-instant even on slower devices.
-        </div>
       </div>
     </div>
   )
