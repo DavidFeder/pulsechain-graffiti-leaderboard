@@ -1,3 +1,5 @@
+import { isEmptyGraffiti } from './aggregateGraffiti';
+
 /**
  * Decodes the 32-byte graffiti field from a beacon block.
  * Returns a clean human-readable string (trailing null bytes removed).
@@ -26,9 +28,5 @@ export function decodeGraffiti(hex: string | null | undefined): string {
   }
 }
 
-/**
- * Checks if the graffiti is essentially empty (all zeros or whitespace)
- */
-export function isEmptyGraffiti(graffiti: string): boolean {
-  return !graffiti || graffiti.length === 0
-}
+// Re-export for convenience
+export { isEmptyGraffiti } from './aggregateGraffiti';
