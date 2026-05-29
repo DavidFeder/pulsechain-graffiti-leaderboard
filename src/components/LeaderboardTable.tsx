@@ -30,7 +30,7 @@ export function LeaderboardTable({ entries }: Props) {
             <tr key={index}>
               <td className="font-mono text-zinc-500">{index + 1}</td>
               <td>
-                <code className="graffiti-cell bg-zinc-950 px-2 py-1 rounded text-purple-400 text-[13px]">
+                <code className="graffiti-cell bg-zinc-950 px-2 py-1 rounded text-[#FF00AA] text-[13px]">
                   {entry.graffiti}
                 </code>
               </td>

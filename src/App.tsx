@@ -2,7 +2,8 @@ import { useState, useEffect } from 'react'
 import { useBeaconGraffiti } from './hooks/useBeaconGraffiti'
 import { StatsCards } from './components/StatsCards'
 import { LeaderboardTable } from './components/LeaderboardTable'
-import { RefreshCw, AlertCircle, Database, Clock, Cpu } from 'lucide-react'
+import { PulseChainLogo } from './components/PulseChainLogo'
+import { RefreshCw, AlertCircle, Database, Cpu } from 'lucide-react'
 
 function formatRelativeTime(timestamp: number | null): string {
   if (!timestamp) return ''
@@ -32,7 +33,6 @@ function App() {
     await load(slotCount, false)
   }
 
-  // Determine the loading message
   const loadingMessage = result.loading
     ? result.progress < 100 && result.progress > 0
       ? `Fetching new blocks... ${result.progress}%`
@@ -42,13 +42,20 @@ function App() {
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#ededed]">
       <div className="max-w-5xl mx-auto px-6 py-10">
+        {/* Header with Logo */}
         <div className="mb-10">
-          <div className="flex items-center gap-3 mb-2">
-            <div className="text-4xl font-bold tracking-tighter">PulseChain</div>
-            <div className="text-4xl font-bold tracking-tighter bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
-              Graffiti Leaderboard
+          <div className="flex items-center gap-4 mb-2">
+            <PulseChainLogo size={48} className="drop-shadow-[0_0_8px_rgba(255,0,170,0.4)]" />
+            <div>
+              <div className="flex items-center gap-3">
+                <div className="text-4xl font-bold tracking-tighter">PulseChain</div>
+                <div className="text-4xl font-bold tracking-tighter bg-gradient-to-r from-[#00D4FF] via-[#A855F7] to-[#FF00AA] bg-clip-text text-transparent">
+                  Graffiti Leaderboard
+                </div>
+              </div>
             </div>
           </div>
+
           <p className="text-lg text-zinc-400 max-w-2xl">
             Real beacon chain graffiti from the last <span className="font-mono">{slotCount}</span> slots.{' '}
             <span className="text-zinc-500">Pure client-side. No backend.</span>
@@ -61,7 +68,7 @@ function App() {
         {/* Cache status */}
         {result.isFromCache && result.cachedAt && (
           <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm">
-            <div className="flex items-center gap-2 text-purple-400">
+            <div className="flex items-center gap-2 text-[#FF00AA]">
               <Database className="h-4 w-4" />
               <span>Loaded from cache</span>
             </div>
@@ -69,7 +76,7 @@ function App() {
               Last synced {formatRelativeTime(result.cachedAt)} • up to slot {result.lastHeadSlot?.toLocaleString()}
             </div>
             {result.newSlotsAvailable > 0 && (
-              <div className="ml-auto rounded bg-purple-500/10 px-3 py-1 text-xs font-medium text-purple-400">
+              <div className="ml-auto rounded bg-[#FF00AA]/10 px-3 py-1 text-xs font-medium text-[#FF00AA]">
                 {result.newSlotsAvailable} new slots since last visit
               </div>
             )}
@@ -96,7 +103,7 @@ function App() {
                 type="number"
                 value={slotCount}
                 onChange={(e) => setSlotCount(Math.max(50, Math.min(2000, Number(e.target.value) || 300)))}
-                className="w-28 bg-black border border-zinc-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-purple-500"
+                className="w-28 bg-black border border-zinc-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-[#FF00AA]"
               />
             </div>
             <div className="text-[10px] text-zinc-500 mt-1">Higher = slower first load</div>
@@ -106,7 +113,10 @@ function App() {
             <button
               onClick={() => handleLoad(false)}
               disabled={result.loading}
-              className="flex items-center gap-2 pulse-button text-white font-medium px-5 py-2.5 rounded text-sm disabled:bg-zinc-800 disabled:text-zinc-400 disabled:bg-none disabled:cursor-not-allowed"
+              className="flex items-center gap-2 text-white font-medium px-5 py-2.5 rounded text-sm transition-all disabled:bg-zinc-800 disabled:text-zinc-400 disabled:bg-none disabled:cursor-not-allowed"
+              style={{
+                background: 'linear-gradient(to right, #00D4FF, #FF00AA)'
+              }}
             >
               {result.loading ? (
                 <>{loadingMessage}</>
@@ -151,7 +161,7 @@ function App() {
           <div className="mb-6">
             <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
               <div 
-                className="h-1.5 bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-200" 
+                className="h-1.5 bg-gradient-to-r from-[#00D4FF] to-[#FF00AA] transition-all duration-200" 
                 style={{ width: `${result.progress}%` }} 
               />
             </div>

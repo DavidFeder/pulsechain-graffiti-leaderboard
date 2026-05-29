@@ -11,9 +11,9 @@ export default {
       },
       colors: {
         pulse: {
-          blue: '#3B82F6',
-          purple: '#A855F7',
-          violet: '#C026D3',
+          blue: '#00D4FF',      // brighter cyan-blue (left side of logo)
+          magenta: '#FF00AA',   // hot magenta/pink (right side of logo)
+          pink: '#FF1493',
         }
       }
     },
