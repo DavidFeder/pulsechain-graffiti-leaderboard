@@ -1,43 +1,19 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { decodeGraffiti, isEmptyGraffiti } from '../lib/decodeGraffiti'
+import { decodeGraffiti } from '../lib/decodeGraffiti'
 import { fetchWithConcurrencyLimit } from '../utils/concurrency'
-import { saveCachedWindow, loadCachedWindow, clearCachedWindow } from '../lib/storage'
+import {
+  saveCachedWindow,
+  loadCachedWindow,
+  clearCachedWindow,
+  type CachedWindow,
+} from '../lib/storage'
 import { computeLeaderboard } from '../lib/aggregateGraffiti'
 import type { WorkerRequest, WorkerResponse } from '../lib/aggregateGraffiti'
 import { BEACON_API, CONCURRENCY, QUICK_CACHE_KEY } from '../lib/constants'
 import { fetchWithRetry } from '../utils/retry'
 
-// Re-export for App.tsx convenience
-export type { CachedWindow } from '../lib/storage'
-
-export interface GraffitiEntry {
-  graffiti: string
-  count: number
-  percentage: number
-}
-
-export interface FetchResult {
-  entries: GraffitiEntry[]
-  totalSlotsRequested: number
-  totalSlotsFetched: number
-  slotsWithGraffiti: number
-  uniqueGraffiti: number
-  loading: boolean
-  progress: number
-  error: string | null
-  isFromCache: boolean
-  cachedAt: number | null
-  lastHeadSlot: number | null
-  newSlotsAvailable: number
-}
-export interface CachedWindow {
-  version: 1
-  windowSize: number
-  lastHeadSlot: number
-  records: Array<{ slot: number; graffiti: string }>
-  cachedAt: number
-}
-
+// Quick cache is a tiny snapshot used purely for instant UI on returning visitors.
+// It is intentionally separate from the full record cache.
 function saveQuickResult(data: {
   entries: GraffitiEntry[]
   totalSlotsRequested: number
@@ -59,10 +35,50 @@ function loadQuickResult() {
 }
 
 function clearQuickResult() {
-  try { localStorage.removeItem(QUICK_CACHE_KEY) } catch {}
+  try {
+    localStorage.removeItem(QUICK_CACHE_KEY)
+  } catch {}
 }
 
+// =============================================================================
+// TYPES
+// =============================================================================
+
+export interface GraffitiEntry {
+  graffiti: string
+  count: number
+  percentage: number
+}
+
+export interface FetchResult {
+  entries: GraffitiEntry[]
+  totalSlotsRequested: number
+  totalSlotsFetched: number
+  slotsWithGraffiti: number
+  uniqueGraffiti: number
+  loading: boolean
+  progress: number
+  error: string | null
+  isFromCache: boolean
+  cachedAt: number | null
+  lastHeadSlot: number | null
+  newSlotsAvailable: number
+}
+
+/**
+ * Main hook that orchestrates fetching, caching, and aggregation of beacon graffiti.
+ *
+ * Architecture highlights:
+ * - Two-tier caching: "quick" snapshot for instant paint + full record window for correctness
+ * - Incremental updates: only fetch new slots since the last cached head
+ * - Heavy aggregation moved to a Web Worker so the main thread stays responsive
+ * - AbortController everywhere to cancel stale requests when the user changes parameters
+ */
 export function useBeaconGraffiti() {
+  // ---------------------------------------------------------------------------
+  // Initial state: try to show previous result instantly using the tiny quick cache.
+  // This is what makes returning visitors see data with zero loading time.
+  // ---------------------------------------------------------------------------
   const [result, setResult] = useState<FetchResult>(() => {
     const quick = loadQuickResult()
     if (quick) {
@@ -100,7 +116,11 @@ export function useBeaconGraffiti() {
   const workerRef = useRef<Worker | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
 
-  // Initialize Web Worker once
+  // ---------------------------------------------------------------------------
+  // Web Worker initialization (runs once).
+  // We keep one long-lived worker for the lifetime of the app.
+  // All heavy Map + sort work happens off the main thread.
+  // ---------------------------------------------------------------------------
   useEffect(() => {
     const worker = new Worker(
       new URL('../workers/graffitiAggregator.worker.ts', import.meta.url),
@@ -109,10 +129,10 @@ export function useBeaconGraffiti() {
     workerRef.current = worker
 
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
-      const message = event.data;
+      const message = event.data
 
       if (message.type === 'AGGREGATE_RESULT') {
-        const workerResult = message.result;
+        const workerResult = message.result
 
         setResult(prev => {
           const newState = {
@@ -125,19 +145,20 @@ export function useBeaconGraffiti() {
             progress: 100,
             error: null,
             isFromCache: false,
-          };
+          }
 
+          // Persist a tiny snapshot so the next visit is instant.
           if (prev.lastHeadSlot && prev.totalSlotsRequested) {
             saveQuickResult({
               entries: workerResult.entries,
               totalSlotsRequested: prev.totalSlotsRequested,
               cachedAt: Date.now(),
               lastHeadSlot: prev.lastHeadSlot,
-            });
+            })
           }
 
-          return newState;
-        });
+          return newState
+        })
       }
 
       if (message.type === 'ERROR') {
@@ -145,41 +166,45 @@ export function useBeaconGraffiti() {
           ...prev,
           loading: false,
           error: message.error || 'Worker aggregation failed',
-        }));
+        }))
       }
-    };
+    }
 
     worker.onerror = (err) => {
-      console.error('Graffiti worker error:', err);
+      console.error('Graffiti worker error:', err)
       setResult(prev => ({
         ...prev,
         loading: false,
         error: 'Aggregation worker crashed',
-      }));
-    };
+      }))
+    }
 
     return () => {
-      worker.terminate();
-      workerRef.current = null;
-    };
-  }, []);
+      worker.terminate()
+      workerRef.current = null
+    }
+  }, [])
 
-  // Cleanup any pending requests on unmount
+  // Abort any in-flight network requests when the component unmounts.
   useEffect(() => {
     return () => {
-      abortControllerRef.current?.abort();
-    };
-  }, []);
+      abortControllerRef.current?.abort()
+    }
+  }, [])
 
+  // ---------------------------------------------------------------------------
+  // Aggregation helper (prefers worker, falls back to main thread).
+  // ---------------------------------------------------------------------------
   const aggregateViaWorker = useCallback((records: Array<{ slot: number; graffiti: string }>, meta: {
-    totalSlotsRequested: number;
-    lastHeadSlot: number;
-    cachedAt?: number;
+    totalSlotsRequested: number
+    lastHeadSlot: number
+    cachedAt?: number
   }) => {
-    const worker = workerRef.current;
+    const worker = workerRef.current
+
     if (!worker) {
-      // Fallback to main thread
-      const agg = computeLeaderboard(records);
+      // Graceful degradation: do the work on the main thread.
+      const agg = computeLeaderboard(records)
       setResult(prev => ({
         ...prev,
         ...agg,
@@ -188,8 +213,8 @@ export function useBeaconGraffiti() {
         progress: 100,
         lastHeadSlot: meta.lastHeadSlot,
         cachedAt: meta.cachedAt ?? Date.now(),
-      }));
-      return;
+      }))
+      return
     }
 
     setResult(prev => ({
@@ -198,32 +223,40 @@ export function useBeaconGraffiti() {
       progress: 0,
       totalSlotsRequested: meta.totalSlotsRequested,
       lastHeadSlot: meta.lastHeadSlot,
-    }));
+    }))
 
-    const request: WorkerRequest = {
-      type: 'AGGREGATE',
-      records,
-    };
-    worker.postMessage(request);
-  }, []);
+    const request: WorkerRequest = { type: 'AGGREGATE', records }
+    worker.postMessage(request)
+  }, [])
 
-  // Hydrate from localStorage + kick off worker (non-blocking)
+  // ---------------------------------------------------------------------------
+  // On first mount, if we have a full cached window, start aggregating it
+  // immediately in the background. This is what gives "instant" results.
+  // ---------------------------------------------------------------------------
   useEffect(() => {
-    const cached = loadCachedWindow();
+    const cached = loadCachedWindow()
     if (cached && cached.records.length > 0) {
       aggregateViaWorker(cached.records, {
         totalSlotsRequested: cached.windowSize,
         lastHeadSlot: cached.lastHeadSlot,
         cachedAt: cached.cachedAt,
-      });
+      })
     }
-  }, [aggregateViaWorker]);
+  }, [aggregateViaWorker])
 
+  // ---------------------------------------------------------------------------
+  // Core load function.
+  // - Always fetches current head first.
+  // - Tries to do a cheap delta update when possible.
+  // - Persists the new full window.
+  // - Hands the records off to the worker for aggregation.
+  // ---------------------------------------------------------------------------
   const load = useCallback(async (slotCount: number, forceFullRefresh = false) => {
-    abortControllerRef.current?.abort();
-    const controller = new AbortController();
-    abortControllerRef.current = controller;
-    const { signal } = controller;
+    // Cancel any previous in-flight request (user changed slot count, etc.)
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    const { signal } = controller
 
     setResult(prev => ({
       ...prev,
@@ -232,31 +265,35 @@ export function useBeaconGraffiti() {
       progress: 0,
       totalSlotsRequested: slotCount,
       isFromCache: false,
-    }));
+    }))
 
     try {
-      // Head fetch with retry
+      // Get the latest head slot (with retry + abort support)
       const headRes = await fetchWithRetry(
         `${BEACON_API}/eth/v1/beacon/headers/head`,
         { signal },
-        2 // retries
-      );
+        2
+      )
+      if (!headRes.ok) throw new Error('Failed to fetch head slot from beacon API')
 
-      if (!headRes.ok) throw new Error('Failed to fetch head slot from beacon API');
-      const headData = await headRes.json();
-      const currentHeadSlot: number = Number(headData.data.header.message.slot);
+      const headData = await headRes.json()
+      const currentHeadSlot: number = Number(headData.data.header.message.slot)
 
-      const cached = !forceFullRefresh ? loadCachedWindow() : null;
-      let records: Array<{ slot: number; graffiti: string }> = [];
+      const cached = !forceFullRefresh ? loadCachedWindow() : null
+      let records: Array<{ slot: number; graffiti: string }> = []
 
+      // -----------------------------------------------------------------------
+      // Happy path: we have a previous window of the exact same size.
+      // Only fetch the new slots that appeared since last time.
+      // -----------------------------------------------------------------------
       if (cached && cached.records.length > 0 && cached.windowSize === slotCount) {
-        const lastKnown = cached.lastHeadSlot;
-        const delta = currentHeadSlot - lastKnown;
+        const lastKnown = cached.lastHeadSlot
+        const delta = currentHeadSlot - lastKnown
 
         if (delta > 0) {
-          const newSlots = Array.from({ length: delta }, (_, i) => lastKnown + 1 + i);
-          let completed = 0;
+          const newSlots = Array.from({ length: delta }, (_, i) => lastKnown + 1 + i)
 
+          let completed = 0
           const newRecords = await fetchWithConcurrencyLimit(
             newSlots,
             async (slot, _index, fetchSignal) => {
@@ -264,35 +301,43 @@ export function useBeaconGraffiti() {
                 const res = await fetchWithRetry(
                   `${BEACON_API}/eth/v2/beacon/blocks/${slot}`,
                   { signal: fetchSignal },
-                  1 // fewer retries for individual blocks
-                );
-                if (!res.ok) return null;
-                const block = await res.json();
-                const g = decodeGraffiti(block?.data?.message?.body?.graffiti);
-                completed++;
-                const p = Math.round((completed / delta) * 100);
-                setResult(prev => ({ ...prev, progress: p }));
-                return { slot, graffiti: g };
+                  1
+                )
+                if (!res.ok) return null
+
+                const block = await res.json()
+                const g = decodeGraffiti(block?.data?.message?.body?.graffiti)
+
+                completed++
+                const p = Math.round((completed / delta) * 100)
+                setResult(prev => ({ ...prev, progress: p }))
+
+                return { slot, graffiti: g }
               } catch (err) {
-                if (err instanceof Error && err.name === 'AbortError') return null;
-                completed++;
-                return null;
+                if (err instanceof Error && err.name === 'AbortError') return null
+                completed++
+                return null
               }
             },
             CONCURRENCY,
             signal
-          );
+          )
 
-          const cutoffSlot = currentHeadSlot - slotCount + 1;
-          const survivingOld = cached.records.filter(r => r.slot >= cutoffSlot);
-          records = [...survivingOld, ...newRecords.filter(Boolean) as any];
+          // Keep old records that are still inside the requested window
+          const cutoffSlot = currentHeadSlot - slotCount + 1
+          const survivingOld = cached.records.filter(r => r.slot >= cutoffSlot)
+          records = [...survivingOld, ...newRecords.filter(Boolean) as any]
         } else {
-          records = cached.records;
+          // No new blocks since last visit — just reuse what we have
+          records = cached.records
         }
       } else {
-        const slots = Array.from({ length: slotCount }, (_, i) => currentHeadSlot - i);
-        let completed = 0;
+        // -------------------------------------------------------------------
+        // Cold start or window size changed: fetch the full requested window.
+        // -------------------------------------------------------------------
+        const slots = Array.from({ length: slotCount }, (_, i) => currentHeadSlot - i)
 
+        let completed = 0
         const fetched = await fetchWithConcurrencyLimit(
           slots,
           async (slot, _index, fetchSignal) => {
@@ -301,73 +346,84 @@ export function useBeaconGraffiti() {
                 `${BEACON_API}/eth/v2/beacon/blocks/${slot}`,
                 { signal: fetchSignal },
                 1
-              );
-              if (!res.ok) return null;
-              const block = await res.json();
-              const g = decodeGraffiti(block?.data?.message?.body?.graffiti);
-              completed++;
-              const p = Math.round((completed / slotCount) * 100);
-              setResult(prev => ({ ...prev, progress: p }));
-              return { slot, graffiti: g };
+              )
+              if (!res.ok) return null
+
+              const block = await res.json()
+              const g = decodeGraffiti(block?.data?.message?.body?.graffiti)
+
+              completed++
+              const p = Math.round((completed / slotCount) * 100)
+              setResult(prev => ({ ...prev, progress: p }))
+
+              return { slot, graffiti: g }
             } catch (err) {
-              if (err instanceof Error && err.name === 'AbortError') return null;
-              completed++;
-              return null;
+              if (err instanceof Error && err.name === 'AbortError') return null
+              completed++
+              return null
             }
           },
           CONCURRENCY,
           signal
-        );
-        records = fetched.filter(Boolean) as any;
+        )
+        records = fetched.filter(Boolean) as any
       }
 
-      const cutoff = currentHeadSlot - slotCount + 1;
-      records = records.filter(r => r.slot >= cutoff).slice(-slotCount);
+      // Final safety trim to exactly the requested window size
+      const cutoff = currentHeadSlot - slotCount + 1
+      records = records.filter(r => r.slot >= cutoff).slice(-slotCount)
 
+      // Persist the full window for next time
       const toCache: CachedWindow = {
         version: 1,
         windowSize: slotCount,
         lastHeadSlot: currentHeadSlot,
         records,
         cachedAt: Date.now(),
-      };
-      saveCachedWindow(toCache);
+      }
+      saveCachedWindow(toCache)
 
+      // Hand off to worker (or main-thread fallback) for aggregation
       aggregateViaWorker(records, {
         totalSlotsRequested: slotCount,
         lastHeadSlot: currentHeadSlot,
         cachedAt: toCache.cachedAt,
-      });
+      })
     } catch (err: any) {
-      if (err instanceof Error && err.name === 'AbortError') return;
+      if (err instanceof Error && err.name === 'AbortError') return
       setResult(prev => ({
         ...prev,
         loading: false,
         error: err.message || 'Failed to load graffiti data',
-      }));
+      }))
     }
-  }, [aggregateViaWorker]);
+  }, [aggregateViaWorker])
 
+  // ---------------------------------------------------------------------------
+  // Lightweight head check used by the visibility listener in App.tsx.
+  // Does not trigger a full reload — just updates the "X new slots" badge.
+  // ---------------------------------------------------------------------------
   const checkForUpdates = useCallback(async () => {
-    const cached = loadCachedWindow();
-    if (!cached) return 0;
+    const cached = loadCachedWindow()
+    if (!cached) return 0
 
     try {
-      const headRes = await fetchWithRetry(`${BEACON_API}/eth/v1/beacon/headers/head`, {}, 1);
-      const headSlot = Number((await headRes.json()).data.header.message.slot);
-      const delta = headSlot - cached.lastHeadSlot;
-      const newDelta = Math.max(0, delta);
+      const headRes = await fetchWithRetry(`${BEACON_API}/eth/v1/beacon/headers/head`, {}, 1)
+      const headSlot = Number((await headRes.json()).data.header.message.slot)
+      const delta = headSlot - cached.lastHeadSlot
+      const newDelta = Math.max(0, delta)
 
-      setResult(prev => ({ ...prev, newSlotsAvailable: newDelta }));
-      return newDelta;
+      setResult(prev => ({ ...prev, newSlotsAvailable: newDelta }))
+      return newDelta
     } catch {
-      return 0;
+      return 0
     }
-  }, []);
+  }, [])
 
   const clearCache = useCallback(() => {
-    clearCachedWindow();
-    clearQuickResult();
+    clearCachedWindow()
+    clearQuickResult()
+
     setResult({
       entries: [],
       totalSlotsRequested: 0,
@@ -381,8 +437,8 @@ export function useBeaconGraffiti() {
       cachedAt: null,
       lastHeadSlot: null,
       newSlotsAvailable: 0,
-    });
-  }, []);
+    })
+  }, [])
 
-  return { result, load, checkForUpdates, clearCache };
+  return { result, load, checkForUpdates, clearCache }
 }
