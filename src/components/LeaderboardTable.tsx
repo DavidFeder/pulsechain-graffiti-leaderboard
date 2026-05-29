@@ -14,12 +14,40 @@ export function LeaderboardTable({ entries }: Props) {
     )
   }
 
+  const getMetalBadge = (index: number) => {
+    if (index === 0) {
+      // Gold
+      return (
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 text-[11px] font-bold text-amber-950 shadow-inner ring-1 ring-yellow-400/60">
+          1
+        </div>
+      )
+    }
+    if (index === 1) {
+      // Silver
+      return (
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400 text-[11px] font-bold text-slate-700 shadow-inner ring-1 ring-slate-300/60">
+          2
+        </div>
+      )
+    }
+    if (index === 2) {
+      // Bronze
+      return (
+        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-orange-300 via-amber-500 to-orange-700 text-[11px] font-bold text-amber-100 shadow-inner ring-1 ring-orange-400/60">
+          3
+        </div>
+      )
+    }
+    return null
+  }
+
   return (
     <div className="overflow-x-auto">
       <table className="leaderboard-table w-full text-sm">
         <thead>
           <tr>
-            <th className="w-12">#</th>
+            <th className="w-16">#</th>
             <th>GRAFFITI</th>
             <th className="w-24 text-right">COUNT</th>
             <th className="w-28 text-right">% OF BLOCKS</th>
@@ -28,7 +56,13 @@ export function LeaderboardTable({ entries }: Props) {
         <tbody>
           {entries.map((entry, index) => (
             <tr key={index}>
-              <td className="font-mono text-zinc-500">{index + 1}</td>
+              <td>
+                <div className="flex items-center gap-2">
+                  {getMetalBadge(index) || (
+                    <span className="font-mono text-zinc-500 pl-1">{index + 1}</span>
+                  )}
+                </div>
+              </td>
               <td>
                 <code className="graffiti-cell bg-zinc-950 px-2 py-1 rounded text-[#FF00AA] text-[13px]">
                   {entry.graffiti}
