@@ -46,3 +46,16 @@ export function computeLeaderboard(
     uniqueGraffiti: sorted.length,
   };
 }
+
+// =============================================
+// Strongly Typed Worker Message Protocol
+// =============================================
+
+export type WorkerRequest = {
+  type: 'AGGREGATE';
+  records: Array<{ slot: number; graffiti: string }>;
+};
+
+export type WorkerResponse =
+  | { type: 'AGGREGATE_RESULT'; result: AggregatedResult }
+  | { type: 'ERROR'; error: string };
