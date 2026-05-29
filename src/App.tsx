@@ -20,7 +20,8 @@ function App() {
   const { result, load, checkForUpdates, clearCache } = useBeaconGraffiti()
   const [slotCount, setSlotCount] = useState(300)
 
-  // Only check for updates when the tab is visible
+  // Only check for new slots when the browser tab is visible.
+  // This avoids wasting requests while the user is on another tab.
   useEffect(() => {
     if (!result.lastHeadSlot) return
 
@@ -45,10 +46,6 @@ function App() {
     load(slotCount, forceFull)
   }
 
-  const handleQuickUpdate = async () => {
-    await load(slotCount, false)
-  }
-
   const loadingMessage = result.loading
     ? result.progress < 100 && result.progress > 0
       ? `Fetching new blocks... ${result.progress}%`
@@ -59,7 +56,7 @@ function App() {
     <div className="min-h-screen bg-[#0a0a0a] text-[#ededed]">
       <div className="max-w-5xl mx-auto px-6 py-10">
         <ErrorBoundary>
-          {/* Header with Logo */}
+          {/* Header */}
           <div className="mb-10">
             <div className="flex items-center gap-4 mb-2">
               <PulseChainLogo size={48} className="drop-shadow-[0_0_8px_rgba(255,0,170,0.4)]" />
@@ -78,7 +75,7 @@ function App() {
             </p>
           </div>
 
-          {/* Cache status with better timestamp */}
+          {/* Cache status banner */}
           {result.isFromCache && result.cachedAt && (
             <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm">
               <div className="flex items-center gap-2 text-[#FF00AA]">
@@ -169,7 +166,7 @@ function App() {
             </div>
           )}
 
-          {/* Progress */}
+          {/* Progress bar */}
           {result.loading && (
             <div className="mb-6">
               <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
