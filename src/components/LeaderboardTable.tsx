@@ -60,7 +60,9 @@ export function LeaderboardTable({ entries }: Props) {
         <thead>
           <tr>
             <th className="w-48 pl-16">
-              <span className="ml-4 inline-block w-7 text-center font-mono text-[11px] text-zinc-400">#</span>
+              <div className="ml-4 flex h-7 w-7 items-center justify-center rounded border border-zinc-700 bg-zinc-950 font-mono text-[11px] font-semibold text-zinc-300">
+                #
+              </div>
             </th>
             <th>GRAFFITI</th>
             <th className="w-24 text-right">COUNT</th>
