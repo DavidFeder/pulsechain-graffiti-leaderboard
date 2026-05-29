@@ -75,7 +75,7 @@ export function LeaderboardTable({ entries }: Props) {
               <td className="pl-16">
                 <div className="flex items-center gap-2">
                   {getMetalBadge(index) || (
-                    <div className="ml-4 flex h-7 w-7 items-center justify-center font-mono text-zinc-500 text-[11px]">
+                    <div className="ml-4 flex h-7 w-7 items-center justify-center rounded border border-zinc-800 bg-zinc-950 font-mono text-[11px] text-zinc-400">
                       {index + 1}
                     </div>
                   )}
