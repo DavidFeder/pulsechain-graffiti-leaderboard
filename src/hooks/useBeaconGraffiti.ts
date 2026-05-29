@@ -131,6 +131,7 @@ export function useBeaconGraffiti() {
   })
 
   const workerRef = useRef<Worker | null>(null)
+  const abortControllerRef = useRef<AbortController | null>(null)
 
   // Initialize Web Worker once
   useEffect(() => {
@@ -198,6 +199,13 @@ export function useBeaconGraffiti() {
     }
   }, [])
 
+  // Cleanup any pending requests on unmount
+  useEffect(() => {
+    return () => {
+      abortControllerRef.current?.abort()
+    }
+  }, [])
+
   // Function to send records to worker for aggregation
   const aggregateViaWorker = useCallback((records: Array<{ slot: number; graffiti: string }>, meta: {
     totalSlotsRequested: number
@@ -250,6 +258,12 @@ export function useBeaconGraffiti() {
   }, [aggregateViaWorker])
 
   const load = useCallback(async (slotCount: number, forceFullRefresh = false) => {
+    // Abort any previous in-flight load
+    abortControllerRef.current?.abort()
+    const controller = new AbortController()
+    abortControllerRef.current = controller
+    const { signal } = controller
+
     setResult(prev => ({
       ...prev,
       loading: true,
@@ -260,7 +274,8 @@ export function useBeaconGraffiti() {
     }))
 
     try {
-      const headRes = await fetch(`${BEACON_API}/eth/v1/beacon/headers/head`)
+      // Fetch head with abort support
+      const headRes = await fetch(`${BEACON_API}/eth/v1/beacon/headers/head`, { signal })
       if (!headRes.ok) throw new Error('Failed to fetch head slot from beacon API')
       const headData = await headRes.json()
       const currentHeadSlot: number = Number(headData.data.header.message.slot)
@@ -269,7 +284,7 @@ export function useBeaconGraffiti() {
       let records: Array<{ slot: number; graffiti: string }> = []
 
       if (cached && cached.records.length > 0 && cached.windowSize === slotCount) {
-        // Incremental update (same as before)
+        // Incremental update
         const lastKnown = cached.lastHeadSlot
         const delta = currentHeadSlot - lastKnown
 
@@ -279,9 +294,11 @@ export function useBeaconGraffiti() {
 
           const newRecords = await fetchWithConcurrencyLimit(
             newSlots,
-            async (slot) => {
+            async (slot, _index, fetchSignal) => {
               try {
-                const res = await fetch(`${BEACON_API}/eth/v2/beacon/blocks/${slot}`)
+                const res = await fetch(`${BEACON_API}/eth/v2/beacon/blocks/${slot}`, {
+                  signal: fetchSignal,
+                })
                 if (!res.ok) return null
                 const block = await res.json()
                 const g = decodeGraffiti(block?.data?.message?.body?.graffiti)
@@ -289,12 +306,16 @@ export function useBeaconGraffiti() {
                 const p = Math.round((completed / delta) * 100)
                 setResult(prev => ({ ...prev, progress: p }))
                 return { slot, graffiti: g }
-              } catch {
+              } catch (err) {
+                if (err instanceof Error && err.name === 'AbortError') {
+                  return null
+                }
                 completed++
                 return null
               }
             },
-            CONCURRENCY
+            CONCURRENCY,
+            signal
           )
 
           const cutoffSlot = currentHeadSlot - slotCount + 1
@@ -310,9 +331,11 @@ export function useBeaconGraffiti() {
 
         const fetched = await fetchWithConcurrencyLimit(
           slots,
-          async (slot) => {
+          async (slot, _index, fetchSignal) => {
             try {
-              const res = await fetch(`${BEACON_API}/eth/v2/beacon/blocks/${slot}`)
+              const res = await fetch(`${BEACON_API}/eth/v2/beacon/blocks/${slot}`, {
+                signal: fetchSignal,
+              })
               if (!res.ok) return null
               const block = await res.json()
               const g = decodeGraffiti(block?.data?.message?.body?.graffiti)
@@ -320,12 +343,16 @@ export function useBeaconGraffiti() {
               const p = Math.round((completed / slotCount) * 100)
               setResult(prev => ({ ...prev, progress: p }))
               return { slot, graffiti: g }
-            } catch {
+            } catch (err) {
+              if (err instanceof Error && err.name === 'AbortError') {
+                return null
+              }
               completed++
               return null
             }
           },
-          CONCURRENCY
+          CONCURRENCY,
+          signal
         )
         records = fetched.filter(Boolean) as any
       }
@@ -351,6 +378,10 @@ export function useBeaconGraffiti() {
         cachedAt: toCache.cachedAt,
       })
     } catch (err: any) {
+      // Ignore abort errors (user triggered a new load)
+      if (err instanceof Error && err.name === 'AbortError') {
+        return
+      }
       setResult(prev => ({
         ...prev,
         loading: false,
