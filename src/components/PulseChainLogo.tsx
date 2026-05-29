@@ -1,10 +1,8 @@
 import React from 'react';
 
-// IMPORTANT:
-// Copy LogoTransparent.png from your other repo into:
-// src/assets/LogoTransparent.png
-// Then commit the image to this repo.
-import logoSrc from '../assets/LogoTransparent.png';
+// Logo is located at: src/LogoTransparent.png
+// (copied from pulsechain-staking-launchpad-validatorstore repo)
+import logoSrc from '../LogoTransparent.png';
 
 interface PulseChainLogoProps {
   className?: string;
