@@ -2,16 +2,24 @@
 
 **Real beacon chain graffiti data** — fetched directly from the consensus layer (where validators actually set `--graffiti "..."` in Lighthouse, Prysm, etc).
 
-This is **Phase 1 MVP**. Pure client-side. No backend. No indexing service.
+This is a **client-side only** tool. No backend, no indexer, no API keys.
 
-### Current Status
-- Fetches the last N slots via the public beacon API
-- Decodes the 32-byte `graffiti` field correctly (strips null padding)
-- Shows frequency leaderboard
-- Works today on https://rpc-pulsechain.g4mm4.io/beacon-api/
+### Key Features
 
-### Why this matters
-Most "graffiti" you see in block explorers (extraData) is just client version strings (geth, linux, etc). The *real* tags validators deliberately put on the chain live in the beacon block body.
+- Uses the **real 32-byte beacon graffiti field** (not the often-junk `extraData`)
+- **Excellent returning visitor experience** via localStorage persistence
+- Smart incremental updates: only fetches new slots since your last visit
+- Because it's immutable blockchain data, cached results remain valid for a long time
+
+### How the Caching Works (The Best Part)
+
+1. First visit: Full fetch of the requested window (e.g. last 300 slots)
+2. The raw `[{slot, graffiti}, ...]` records + metadata are saved to localStorage
+3. Next visit: You see the full leaderboard **instantly** from cache
+4. The "Update with latest blocks" button only fetches the *new* slots that appeared since you last opened the app (often just 5–40 blocks)
+5. The window automatically slides forward — old slots are dropped and counts are recalculated
+
+This design takes full advantage of the fact that blockchain history is immutable. Old graffiti data never becomes invalid.
 
 ### Running locally
 
@@ -22,19 +30,21 @@ npm install
 npm run dev
 ```
 
-Then open http://localhost:5173
+Open http://localhost:5173
 
-### Roadmap (planned)
-- [ ] Increase default window (currently limited for perf)
-- [ ] Live auto-refresh + sliding window
-- [ ] Web Worker for heavy processing
-- [ ] Better charts + historical trends
-- [ ] Proposer index + validator identity lookup
+### Current Status
+
+- [x] Real beacon graffiti decoding
+- [x] LocalStorage persistence + cheap incremental updates
+- [ ] Live auto-refresh (polling)
+- [ ] Web Worker for zero jank
+- [ ] Charts, trends, and time-series
+- [ ] Validator identity lookup (proposer index → graffiti history)
 - [ ] Export CSV / shareable links
 
 ### Tech
-- Vite + React + TypeScript + Tailwind
-- Direct calls to PulseChain beacon API only
-- No external dependencies beyond React for the MVP
 
-Built for fun by the PulseChain community. Data is public and on-chain forever.
+- Vite + React + TypeScript + Tailwind
+- Direct calls only to `https://rpc-pulsechain.g4mm4.io/beacon-api/`
+
+Built for the PulseChain community. All data is public and permanent on-chain.
