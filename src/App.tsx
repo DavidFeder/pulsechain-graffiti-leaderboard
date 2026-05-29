@@ -22,25 +22,24 @@ function App() {
 
   // Only check for updates when the tab is visible
   useEffect(() => {
-    if (!result.lastHeadSlot) return;
+    if (!result.lastHeadSlot) return
 
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
-        checkForUpdates();
+        checkForUpdates()
       }
-    };
-
-    // Check once on mount if visible
-    if (document.visibilityState === 'visible') {
-      checkForUpdates();
     }
 
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    if (document.visibilityState === 'visible') {
+      checkForUpdates()
+    }
+
+    document.addEventListener('visibilitychange', handleVisibilityChange)
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [result.lastHeadSlot, checkForUpdates]);
+      document.removeEventListener('visibilitychange', handleVisibilityChange)
+    }
+  }, [result.lastHeadSlot, checkForUpdates])
 
   const handleLoad = (forceFull = false) => {
     load(slotCount, forceFull)
@@ -79,7 +78,7 @@ function App() {
             </p>
           </div>
 
-          {/* Cache status */}
+          {/* Cache status with better timestamp */}
           {result.isFromCache && result.cachedAt && (
             <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm">
               <div className="flex items-center gap-2 text-[#FF00AA]">
