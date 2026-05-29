@@ -1,8 +1,9 @@
 import React from 'react';
 
-// Best practice: Place images in src/assets/
-// Move LogoTransparent.png into src/assets/LogoTransparent.png if not already there.
-import logoSrc from '../assets/LogoTransparent.png';
+// The logo file is currently located at:
+// src/LogoTransparent.png
+// (relative to this component: ../LogoTransparent.png)
+import logoSrc from '../LogoTransparent.png';
 
 interface PulseChainLogoProps {
   className?: string;
