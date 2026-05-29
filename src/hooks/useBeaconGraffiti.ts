@@ -2,6 +2,7 @@ import { useState, useCallback, useEffect, useRef } from 'react'
 import { decodeGraffiti, isEmptyGraffiti } from '../lib/decodeGraffiti'
 import { fetchWithConcurrencyLimit } from '../utils/concurrency'
 import { saveCachedWindow, loadCachedWindow, clearCachedWindow } from '../lib/storage'
+import { computeLeaderboard } from '../lib/aggregateGraffiti'
 import type { WorkerRecord, WorkerResult } from '../workers/graffitiAggregator.worker'
 
 // Re-export for App.tsx convenience
@@ -27,7 +28,6 @@ export interface FetchResult {
   lastHeadSlot: number | null
   newSlotsAvailable: number
 }
-
 export interface CachedWindow {
   version: 1
   windowSize: number
@@ -66,43 +66,14 @@ function clearQuickResult() {
   try { localStorage.removeItem(QUICK_CACHE_KEY) } catch {}
 }
 
-// Helper to turn raw records into the UI shape (used as fallback)
-function aggregateInMain(records: Array<{ slot: number; graffiti: string }>) {
-  const counts = new Map<string, number>()
-  let withGraffiti = 0
-
-  for (const r of records) {
-    if (!isEmptyGraffiti(r.graffiti)) {
-      withGraffiti++
-      counts.set(r.graffiti, (counts.get(r.graffiti) || 0) + 1)
-    }
-  }
-
-  const sorted: GraffitiEntry[] = Array.from(counts.entries())
-    .map(([graffiti, count]) => ({
-      graffiti,
-      count,
-      percentage: records.length > 0 ? (count / records.length) * 100 : 0,
-    }))
-    .sort((a, b) => b.count - a.count)
-
-  return {
-    entries: sorted,
-    totalSlotsFetched: records.length,
-    slotsWithGraffiti: withGraffiti,
-    uniqueGraffiti: sorted.length,
-  }
-}
-
 export function useBeaconGraffiti() {
   const [result, setResult] = useState<FetchResult>(() => {
-    // Synchronous initial state from the lightweight quick cache (zero jank)
     const quick = loadQuickResult()
     if (quick) {
       return {
         entries: quick.entries,
         totalSlotsRequested: quick.totalSlotsRequested,
-        totalSlotsFetched: quick.entries.length > 0 ? quick.totalSlotsRequested : 0, // approximate
+        totalSlotsFetched: quick.entries.length > 0 ? quick.totalSlotsRequested : 0,
         slotsWithGraffiti: 0,
         uniqueGraffiti: quick.entries.length,
         loading: false,
@@ -135,7 +106,6 @@ export function useBeaconGraffiti() {
 
   // Initialize Web Worker once
   useEffect(() => {
-    // Vite-specific worker import
     const worker = new Worker(
       new URL('../workers/graffitiAggregator.worker.ts', import.meta.url),
       { type: 'module' }
@@ -158,10 +128,9 @@ export function useBeaconGraffiti() {
             loading: false,
             progress: 100,
             error: null,
-            isFromCache: false, // fresh computation
+            isFromCache: false,
           }
 
-          // Also update the quick cache for next instant load
           if (prev.lastHeadSlot && prev.totalSlotsRequested) {
             saveQuickResult({
               entries: workerResult.entries,
@@ -206,7 +175,6 @@ export function useBeaconGraffiti() {
     }
   }, [])
 
-  // Function to send records to worker for aggregation
   const aggregateViaWorker = useCallback((records: Array<{ slot: number; graffiti: string }>, meta: {
     totalSlotsRequested: number
     lastHeadSlot: number
@@ -214,8 +182,8 @@ export function useBeaconGraffiti() {
   }) => {
     const worker = workerRef.current
     if (!worker) {
-      // Fallback to main thread if worker not ready
-      const agg = aggregateInMain(records)
+      // Fallback to main thread
+      const agg = computeLeaderboard(records)
       setResult(prev => ({
         ...prev,
         ...agg,
@@ -236,7 +204,6 @@ export function useBeaconGraffiti() {
       lastHeadSlot: meta.lastHeadSlot,
     }))
 
-    // Send work to the worker thread
     worker.postMessage({
       type: 'AGGREGATE',
       records: records as WorkerRecord[],
@@ -247,8 +214,6 @@ export function useBeaconGraffiti() {
   useEffect(() => {
     const cached = loadCachedWindow()
     if (cached && cached.records.length > 0) {
-      // Show the quick pre-computed result immediately (from constructor above)
-      // Then send raw records to worker for fresh, accurate aggregation
       aggregateViaWorker(cached.records, {
         totalSlotsRequested: cached.windowSize,
         lastHeadSlot: cached.lastHeadSlot,
@@ -258,7 +223,6 @@ export function useBeaconGraffiti() {
   }, [aggregateViaWorker])
 
   const load = useCallback(async (slotCount: number, forceFullRefresh = false) => {
-    // Abort any previous in-flight load
     abortControllerRef.current?.abort()
     const controller = new AbortController()
     abortControllerRef.current = controller
@@ -274,7 +238,6 @@ export function useBeaconGraffiti() {
     }))
 
     try {
-      // Fetch head with abort support
       const headRes = await fetch(`${BEACON_API}/eth/v1/beacon/headers/head`, { signal })
       if (!headRes.ok) throw new Error('Failed to fetch head slot from beacon API')
       const headData = await headRes.json()
@@ -284,7 +247,6 @@ export function useBeaconGraffiti() {
       let records: Array<{ slot: number; graffiti: string }> = []
 
       if (cached && cached.records.length > 0 && cached.windowSize === slotCount) {
-        // Incremental update
         const lastKnown = cached.lastHeadSlot
         const delta = currentHeadSlot - lastKnown
 
@@ -296,9 +258,7 @@ export function useBeaconGraffiti() {
             newSlots,
             async (slot, _index, fetchSignal) => {
               try {
-                const res = await fetch(`${BEACON_API}/eth/v2/beacon/blocks/${slot}`, {
-                  signal: fetchSignal,
-                })
+                const res = await fetch(`${BEACON_API}/eth/v2/beacon/blocks/${slot}`, { signal: fetchSignal })
                 if (!res.ok) return null
                 const block = await res.json()
                 const g = decodeGraffiti(block?.data?.message?.body?.graffiti)
@@ -307,9 +267,7 @@ export function useBeaconGraffiti() {
                 setResult(prev => ({ ...prev, progress: p }))
                 return { slot, graffiti: g }
               } catch (err) {
-                if (err instanceof Error && err.name === 'AbortError') {
-                  return null
-                }
+                if (err instanceof Error && err.name === 'AbortError') return null
                 completed++
                 return null
               }
@@ -325,7 +283,6 @@ export function useBeaconGraffiti() {
           records = cached.records
         }
       } else {
-        // Full fetch
         const slots = Array.from({ length: slotCount }, (_, i) => currentHeadSlot - i)
         let completed = 0
 
@@ -333,9 +290,7 @@ export function useBeaconGraffiti() {
           slots,
           async (slot, _index, fetchSignal) => {
             try {
-              const res = await fetch(`${BEACON_API}/eth/v2/beacon/blocks/${slot}`, {
-                signal: fetchSignal,
-              })
+              const res = await fetch(`${BEACON_API}/eth/v2/beacon/blocks/${slot}`, { signal: fetchSignal })
               if (!res.ok) return null
               const block = await res.json()
               const g = decodeGraffiti(block?.data?.message?.body?.graffiti)
@@ -344,9 +299,7 @@ export function useBeaconGraffiti() {
               setResult(prev => ({ ...prev, progress: p }))
               return { slot, graffiti: g }
             } catch (err) {
-              if (err instanceof Error && err.name === 'AbortError') {
-                return null
-              }
+              if (err instanceof Error && err.name === 'AbortError') return null
               completed++
               return null
             }
@@ -357,11 +310,9 @@ export function useBeaconGraffiti() {
         records = fetched.filter(Boolean) as any
       }
 
-      // Trim window
       const cutoff = currentHeadSlot - slotCount + 1
       records = records.filter(r => r.slot >= cutoff).slice(-slotCount)
 
-      // Save raw window
       const toCache: CachedWindow = {
         version: 1,
         windowSize: slotCount,
@@ -371,17 +322,13 @@ export function useBeaconGraffiti() {
       }
       saveCachedWindow(toCache)
 
-      // Send to worker for aggregation (non-blocking)
       aggregateViaWorker(records, {
         totalSlotsRequested: slotCount,
         lastHeadSlot: currentHeadSlot,
         cachedAt: toCache.cachedAt,
       })
     } catch (err: any) {
-      // Ignore abort errors (user triggered a new load)
-      if (err instanceof Error && err.name === 'AbortError') {
-        return
-      }
+      if (err instanceof Error && err.name === 'AbortError') return
       setResult(prev => ({
         ...prev,
         loading: false,
