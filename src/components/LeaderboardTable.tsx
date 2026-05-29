@@ -59,7 +59,8 @@ export function LeaderboardTable({ entries }: Props) {
       <table className="leaderboard-table w-full text-sm">
         <thead>
           <tr>
-            <th className="w-48 pl-16"></th>
+            {/* Rank column has no text header — the medals/numbers are self-explanatory */}
+            <th className="w-48 pl-16" aria-hidden="true"></th>
             <th>GRAFFITI</th>
             <th className="w-24 text-right">COUNT</th>
             <th className="w-28 text-right">% OF BLOCKS</th>
