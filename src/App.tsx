@@ -20,11 +20,27 @@ function App() {
   const { result, load, checkForUpdates, clearCache } = useBeaconGraffiti()
   const [slotCount, setSlotCount] = useState(300)
 
+  // Only check for updates when the tab is visible
   useEffect(() => {
-    if (result.lastHeadSlot) {
-      checkForUpdates()
+    if (!result.lastHeadSlot) return;
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        checkForUpdates();
+      }
+    };
+
+    // Check once on mount if visible
+    if (document.visibilityState === 'visible') {
+      checkForUpdates();
     }
-  }, [result.lastHeadSlot, checkForUpdates])
+
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+    };
+  }, [result.lastHeadSlot, checkForUpdates]);
 
   const handleLoad = (forceFull = false) => {
     load(slotCount, forceFull)
