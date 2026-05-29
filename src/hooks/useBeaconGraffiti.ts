@@ -1,5 +1,5 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { decodeGraffiti } from '../lib/decodeGraffiti'
+import { decodeGraffiti, isEmptyGraffiti } from '../lib/decodeGraffiti'
 import { fetchWithConcurrencyLimit } from '../utils/concurrency'
 import { saveCachedWindow, loadCachedWindow, clearCachedWindow } from '../lib/storage'
 import { computeLeaderboard } from '../lib/aggregateGraffiti'
