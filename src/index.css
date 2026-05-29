@@ -35,3 +35,18 @@ body {
   border-radius: 8px;
   padding: 16px;
 }
+
+/* PulseChain blue-purple accents */
+.pulse-accent {
+  color: #A855F7;
+}
+
+.pulse-button {
+  background: linear-gradient(to right, #3B82F6, #A855F7);
+  transition: all 0.2s ease;
+}
+
+.pulse-button:hover {
+  background: linear-gradient(to right, #2563EB, #9333EA);
+  transform: translateY(-1px);
+}

@@ -45,7 +45,9 @@ function App() {
         <div className="mb-10">
           <div className="flex items-center gap-3 mb-2">
             <div className="text-4xl font-bold tracking-tighter">PulseChain</div>
-            <div className="text-4xl font-bold tracking-tighter text-emerald-400">Graffiti Leaderboard</div>
+            <div className="text-4xl font-bold tracking-tighter bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">
+              Graffiti Leaderboard
+            </div>
           </div>
           <p className="text-lg text-zinc-400 max-w-2xl">
             Real beacon chain graffiti from the last <span className="font-mono">{slotCount}</span> slots.{' '}
@@ -59,7 +61,7 @@ function App() {
         {/* Cache status */}
         {result.isFromCache && result.cachedAt && (
           <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm">
-            <div className="flex items-center gap-2 text-emerald-400">
+            <div className="flex items-center gap-2 text-purple-400">
               <Database className="h-4 w-4" />
               <span>Loaded from cache</span>
             </div>
@@ -67,7 +69,7 @@ function App() {
               Last synced {formatRelativeTime(result.cachedAt)} • up to slot {result.lastHeadSlot?.toLocaleString()}
             </div>
             {result.newSlotsAvailable > 0 && (
-              <div className="ml-auto rounded bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400">
+              <div className="ml-auto rounded bg-purple-500/10 px-3 py-1 text-xs font-medium text-purple-400">
                 {result.newSlotsAvailable} new slots since last visit
               </div>
             )}
@@ -94,7 +96,7 @@ function App() {
                 type="number"
                 value={slotCount}
                 onChange={(e) => setSlotCount(Math.max(50, Math.min(2000, Number(e.target.value) || 300)))}
-                className="w-28 bg-black border border-zinc-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500"
+                className="w-28 bg-black border border-zinc-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-purple-500"
               />
             </div>
             <div className="text-[10px] text-zinc-500 mt-1">Higher = slower first load</div>
@@ -104,7 +106,7 @@ function App() {
             <button
               onClick={() => handleLoad(false)}
               disabled={result.loading}
-              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:bg-zinc-800 text-black disabled:text-zinc-400 font-medium px-5 py-2.5 rounded text-sm transition-colors"
+              className="flex items-center gap-2 pulse-button text-white font-medium px-5 py-2.5 rounded text-sm disabled:bg-zinc-800 disabled:text-zinc-400 disabled:bg-none disabled:cursor-not-allowed"
             >
               {result.loading ? (
                 <>{loadingMessage}</>
@@ -149,7 +151,7 @@ function App() {
           <div className="mb-6">
             <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
               <div 
-                className="h-1.5 bg-emerald-500 transition-all duration-200" 
+                className="h-1.5 bg-gradient-to-r from-blue-500 to-purple-500 transition-all duration-200" 
                 style={{ width: `${result.progress}%` }} 
               />
             </div>
