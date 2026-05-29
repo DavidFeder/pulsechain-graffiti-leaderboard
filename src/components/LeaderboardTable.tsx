@@ -18,7 +18,11 @@ export function LeaderboardTable({ entries }: Props) {
     if (index === 0) {
       // Gold
       return (
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 text-[11px] font-bold text-amber-950 shadow-inner ring-1 ring-yellow-400/60">
+        <div
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 text-[11px] font-bold text-amber-950 shadow-inner ring-1 ring-yellow-400/60"
+          aria-label="1st place"
+          title="1st place - Gold"
+        >
           1
         </div>
       )
@@ -26,7 +30,11 @@ export function LeaderboardTable({ entries }: Props) {
     if (index === 1) {
       // Silver
       return (
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400 text-[11px] font-bold text-slate-700 shadow-inner ring-1 ring-slate-300/60">
+        <div
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400 text-[11px] font-bold text-slate-700 shadow-inner ring-1 ring-slate-300/60"
+          aria-label="2nd place"
+          title="2nd place - Silver"
+        >
           2
         </div>
       )
@@ -34,7 +42,11 @@ export function LeaderboardTable({ entries }: Props) {
     if (index === 2) {
       // Bronze
       return (
-        <div className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-orange-300 via-amber-500 to-orange-700 text-[11px] font-bold text-amber-100 shadow-inner ring-1 ring-orange-400/60">
+        <div
+          className="flex h-7 w-7 items-center justify-center rounded-full bg-gradient-to-br from-orange-300 via-amber-500 to-orange-700 text-[11px] font-bold text-amber-100 shadow-inner ring-1 ring-orange-400/60"
+          aria-label="3rd place"
+          title="3rd place - Bronze"
+        >
           3
         </div>
       )
