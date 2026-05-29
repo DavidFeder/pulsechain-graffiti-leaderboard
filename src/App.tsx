@@ -1,15 +1,37 @@
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 import { useBeaconGraffiti } from './hooks/useBeaconGraffiti'
 import { StatsCards } from './components/StatsCards'
 import { LeaderboardTable } from './components/LeaderboardTable'
-import { RefreshCw, AlertCircle } from 'lucide-react'
+import { RefreshCw, AlertCircle, Database, Clock } from 'lucide-react'
+
+function formatRelativeTime(timestamp: number | null): string {
+  if (!timestamp) return ''
+  const diff = Date.now() - timestamp
+  const minutes = Math.floor(diff / 60000)
+  if (minutes < 1) return 'just now'
+  if (minutes < 60) return `${minutes}m ago`
+  const hours = Math.floor(minutes / 60)
+  return `${hours}h ago`
+}
 
 function App() {
-  const { result, load } = useBeaconGraffiti()
+  const { result, load, checkForUpdates, clearCache } = useBeaconGraffiti()
   const [slotCount, setSlotCount] = useState(300)
 
-  const handleLoad = () => {
-    load(slotCount)
+  // On mount, after hydration, check how many new slots exist
+  useEffect(() => {
+    if (result.lastHeadSlot) {
+      checkForUpdates()
+    }
+  }, [result.lastHeadSlot, checkForUpdates])
+
+  const handleLoad = (forceFull = false) => {
+    load(slotCount, forceFull)
+  }
+
+  const handleQuickUpdate = async () => {
+    // Fast path: only fetch new blocks since cache
+    await load(slotCount, false)
   }
 
   return (
@@ -26,9 +48,27 @@ function App() {
             <span className="text-zinc-500">Pure client-side. No backend.</span>
           </p>
           <p className="text-xs text-zinc-500 mt-1">
-            Data source: rpc-pulsechain.g4mm4.io beacon API • Only the real 32-byte graffiti field validators set on their nodes
+            Data source: rpc-pulsechain.g4mm4.io beacon API • Only the real 32-byte graffiti validators set on their nodes
           </p>
         </div>
+
+        {/* Cache status for returning visitors */}
+        {result.isFromCache && result.cachedAt && (
+          <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm">
+            <div className="flex items-center gap-2 text-emerald-400">
+              <Database className="h-4 w-4" />
+              <span>Loaded from cache</span>
+            </div>
+            <div className="text-zinc-400">
+              Last synced {formatRelativeTime(result.cachedAt)} • up to slot {result.lastHeadSlot?.toLocaleString()}
+            </div>
+            {result.newSlotsAvailable > 0 && (
+              <div className="ml-auto rounded bg-emerald-500/10 px-3 py-1 text-xs font-medium text-emerald-400">
+                {result.newSlotsAvailable} new slots since last visit
+              </div>
+            )}
+          </div>
+        )}
 
         {/* Controls */}
         <div className="flex flex-wrap items-end gap-4 mb-6">
@@ -53,22 +93,44 @@ function App() {
                 className="w-28 bg-black border border-zinc-700 rounded px-3 py-2 text-sm font-mono focus:outline-none focus:border-emerald-500"
               />
             </div>
-            <div className="text-[10px] text-zinc-500 mt-1">Higher = slower (real beacon blocks are heavy to fetch)</div>
+            <div className="text-[10px] text-zinc-500 mt-1">Higher = slower first load</div>
           </div>
 
-          <button
-            onClick={handleLoad}
-            disabled={result.loading}
-            className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:bg-zinc-800 text-black disabled:text-zinc-400 font-medium px-6 py-2.5 rounded text-sm transition-colors"
-          >
-            {result.loading ? (
-              <>Fetching... {result.progress}%</>
-            ) : (
-              <>
-                <RefreshCw className="w-4 h-4" /> Load / Refresh Leaderboard
-              </>
+          <div className="flex gap-2">
+            <button
+              onClick={() => handleLoad(false)}
+              disabled={result.loading}
+              className="flex items-center gap-2 bg-emerald-500 hover:bg-emerald-600 active:bg-emerald-700 disabled:bg-zinc-800 text-black disabled:text-zinc-400 font-medium px-5 py-2.5 rounded text-sm transition-colors"
+            >
+              {result.loading ? (
+                <>Updating... {result.progress}%</>
+              ) : (
+                <>
+                  <RefreshCw className="w-4 h-4" /> 
+                  {result.isFromCache ? 'Update with latest blocks' : 'Load Leaderboard'}
+                </>
+              )}
+            </button>
+
+            {result.isFromCache && (
+              <button
+                onClick={() => handleLoad(true)}
+                disabled={result.loading}
+                className="flex items-center gap-2 border border-zinc-700 hover:bg-zinc-900 px-4 py-2.5 rounded text-sm transition-colors"
+              >
+                Full refresh
+              </button>
             )}
-          </button>
+
+            {result.cachedAt && (
+              <button
+                onClick={clearCache}
+                className="flex items-center gap-2 border border-zinc-800 hover:bg-zinc-950 px-3 py-2.5 rounded text-sm text-zinc-400 transition-colors"
+              >
+                Clear cache
+              </button>
+            )}
+          </div>
         </div>
 
         {result.error && (
@@ -88,7 +150,7 @@ function App() {
               />
             </div>
             <div className="text-xs text-zinc-500 mt-1.5">
-              Fetching beacon blocks — {result.progress}% complete. This is expected to be slow for correctness.
+              {result.isFromCache ? 'Fetching only new blocks since your last visit...' : 'Fetching beacon blocks...'}
             </div>
           </div>
         )}
@@ -111,14 +173,14 @@ function App() {
 
         {!result.loading && result.entries.length === 0 && result.totalSlotsRequested === 0 && (
           <div className="text-center py-16 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
-            Click <span className="font-medium text-zinc-400">"Load / Refresh Leaderboard"</span> above to fetch real validator graffiti.
-            <div className="text-xs mt-2 max-w-xs mx-auto">Start with 100–300 slots. 500+ will take noticeably longer on public endpoints.</div>
+            Click <span className="font-medium text-zinc-400">"Load Leaderboard"</span> to start.
+            <div className="text-xs mt-2">Returning visitors get instant results from cache (blockchain data never goes stale).
+            </div>
           </div>
         )}
 
         <div className="mt-12 text-[10px] text-zinc-600 leading-relaxed max-w-2xl">
-          This MVP prioritizes correctness: we fetch the actual <code className="text-emerald-400">body.graffiti</code> field from beacon blocks (the 32 bytes validators set with <code>--graffiti</code> in their client).
-          This is deliberately slower than reading execution <code>extraData</code>.
+          Because this is immutable blockchain history, cached results stay valid. We only fetch the new slots since your last visit for near-instant updates.
         </div>
       </div>
     </div>
