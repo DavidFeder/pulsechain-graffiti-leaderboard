@@ -59,7 +59,7 @@ export function LeaderboardTable({ entries }: Props) {
       <table className="leaderboard-table w-full text-sm">
         <thead>
           <tr>
-            <th className="w-36 pl-8">#</th>
+            <th className="w-40 pl-10">#</th>
             <th>GRAFFITI</th>
             <th className="w-24 text-right">COUNT</th>
             <th className="w-28 text-right">% OF BLOCKS</th>
@@ -68,7 +68,7 @@ export function LeaderboardTable({ entries }: Props) {
         <tbody>
           {entries.map((entry, index) => (
             <tr key={index}>
-              <td className="pl-8">
+              <td className="pl-10">
                 <div className="flex items-center gap-2">
                   {getMetalBadge(index) || (
                     <span className="font-mono text-zinc-500 pl-1">{index + 1}</span>
