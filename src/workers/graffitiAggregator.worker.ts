@@ -1,36 +1,29 @@
 /// <reference lib="webworker" />
 
-import { isEmptyGraffiti, computeLeaderboard } from '../lib/aggregateGraffiti';
+import { computeLeaderboard } from '../lib/aggregateGraffiti';
+import type { WorkerRequest, WorkerResponse } from '../lib/aggregateGraffiti';
 
 /**
  * Web Worker for heavy graffiti aggregation.
- * This keeps the main thread completely free.
  */
 
-export interface WorkerRecord {
-  slot: number;
-  graffiti: string;
-}
+self.onmessage = (event: MessageEvent<WorkerRequest>) => {
+  const message = event.data;
 
-// Re-export for type consistency
-export type { AggregatedResult as WorkerResult } from '../lib/aggregateGraffiti';
-
-// Message protocol
-self.onmessage = (event: MessageEvent) => {
-  const { type, records } = event.data;
-
-  if (type === 'AGGREGATE' && Array.isArray(records)) {
+  if (message.type === 'AGGREGATE') {
     try {
-      const result = computeLeaderboard(records);
-      self.postMessage({
+      const result = computeLeaderboard(message.records);
+      const response: WorkerResponse = {
         type: 'AGGREGATE_RESULT',
         result,
-      });
+      };
+      self.postMessage(response);
     } catch (err) {
-      self.postMessage({
+      const response: WorkerResponse = {
         type: 'ERROR',
         error: err instanceof Error ? err.message : 'Unknown aggregation error',
-      });
+      };
+      self.postMessage(response);
     }
   }
 };
