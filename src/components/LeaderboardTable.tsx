@@ -59,9 +59,7 @@ export function LeaderboardTable({ entries }: Props) {
       <table className="leaderboard-table w-full text-sm">
         <thead>
           <tr>
-            <th className="w-48 pl-16">
-              <span className="ml-4 inline-block w-7 text-center font-mono text-[13px] font-bold text-zinc-300">#</span>
-            </th>
+            <th className="w-48 pl-16"></th>
             <th>GRAFFITI</th>
             <th className="w-24 text-right">COUNT</th>
             <th className="w-28 text-right">% OF BLOCKS</th>
