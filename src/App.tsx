@@ -43,6 +43,13 @@ function App() {
     }
   }, [result.lastHeadSlot, checkForUpdates])
 
+  // Automatically load the leaderboard on first page load
+  useEffect(() => {
+    if (result.entries.length === 0 && !result.loading) {
+      load(slotCount, false)
+    }
+  }, []) // Empty dependency array = run only once on mount
+
   const handleLoad = (forceFull = false) => {
     setSearchTerm('') // clear filter on new load
     load(slotCount, forceFull)
@@ -243,7 +250,7 @@ function App() {
 
           {!result.loading && result.entries.length === 0 && result.totalSlotsRequested === 0 && (
             <div className="text-center py-16 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
-              Click <span className="font-medium text-zinc-400">"Load Leaderboard"</span> above.
+              Loading the leaderboard...
               <div className="text-xs mt-2">Returning visitors get instant results thanks to localStorage + Web Worker aggregation.</div>
             </div>
           )}
