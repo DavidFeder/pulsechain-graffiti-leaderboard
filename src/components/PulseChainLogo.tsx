@@ -1,5 +1,3 @@
-import React from 'react';
-
 // The logo file is currently located at:
 // src/LogoTransparent.png
 // (relative to this component: ../LogoTransparent.png)
