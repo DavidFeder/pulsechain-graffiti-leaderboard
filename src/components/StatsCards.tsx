@@ -1,4 +1,3 @@
-import React from 'react'
 import { FetchResult } from '../hooks/useBeaconGraffiti'
 
 interface Props {
@@ -6,7 +5,7 @@ interface Props {
 }
 
 export function StatsCards({ result }: Props) {
-  const { totalSlotsRequested, totalSlotsFetched, slotsWithGraffiti, uniqueGraffiti, isFromCache, cachedAt } = result
+  const { totalSlotsRequested, totalSlotsFetched, slotsWithGraffiti, uniqueGraffiti } = result
 
   return (
     <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
