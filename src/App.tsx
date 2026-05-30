@@ -262,6 +262,22 @@ function App() {
               <div className="text-xs mt-2">Returning visitors get instant results thanks to localStorage + Web Worker aggregation.</div>
             </div>
           )}
+
+          {/* Footer */}
+          <footer className="mt-16 pt-6 border-t border-zinc-800 text-center text-sm text-zinc-500">
+            <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
+              <a
+                href="https://github.com/DavidFeder/pulsechain-graffiti-leaderboard"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="hover:text-zinc-300 transition-colors"
+              >
+                GitHub
+              </a>
+              <span className="hidden sm:inline">•</span>
+              <span>Built for the PulseChain community</span>
+            </div>
+          </footer>
         </ErrorBoundary>
       </div>
     </div>
