@@ -49,3 +49,7 @@ Then close and reopen PowerShell, navigate to the folder, and run `npm install`.
 - Pure client-side (no backend)
 
 Built for the PulseChain community.
+
+---
+
+*Forced redeploy trigger - 2026-05-30*
