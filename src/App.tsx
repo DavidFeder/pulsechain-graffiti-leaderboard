@@ -5,7 +5,6 @@ import { LeaderboardTable } from './components/LeaderboardTable'
 import { PulseChainLogo } from './components/PulseChainLogo'
 import ErrorBoundary from './components/ErrorBoundary'
 import { RefreshCw, AlertCircle, Database, Cpu, X, AlertTriangle } from 'lucide-react'
-import { RefreshCw, AlertCircle, Database, Cpu, X } from 'lucide-react'
 
 function formatRelativeTime(timestamp: number | null): string {
   if (!timestamp) return ''
