@@ -9,7 +9,7 @@ import {
 } from '../lib/storage'
 import { computeLeaderboard } from '../lib/aggregateGraffiti'
 import type { WorkerRequest, WorkerResponse } from '../lib/aggregateGraffiti'
-import { BEACON_API, CONCURRENCY, QUICK_CACHE_KEY } from '../lib/constants'
+import { BEACON_API, CONCURRENCY, QUICK_CACHE_KEY, MAX_CACHE_AGE_MS } from '../lib/constants'
 import { fetchWithRetry } from '../utils/retry'
 
 // Quick cache is a tiny snapshot used purely for instant UI on returning visitors.
@@ -40,6 +40,16 @@ function clearQuickResult() {
   } catch {}
 }
 
+/**
+ * Returns true if the given timestamp is older than MAX_CACHE_AGE_MS.
+ * Used to warn users that displayed aggregates may be based on a stale baseline
+ * even if a few new slots were delta-fetched on top.
+ */
+function isCacheStale(cachedAt: number | null | undefined): boolean {
+  if (!cachedAt) return false
+  return Date.now() - cachedAt > MAX_CACHE_AGE_MS
+}
+
 // =============================================================================
 // TYPES
 // =============================================================================
@@ -63,6 +73,11 @@ export interface FetchResult {
   cachedAt: number | null
   lastHeadSlot: number | null
   newSlotsAvailable: number
+  /**
+   * True when the underlying cache (quick or full window) is older than MAX_CACHE_AGE_MS.
+   * UI should show a warning and encourage a Full refresh.
+   */
+  isStale: boolean
 }
 
 /**
@@ -73,11 +88,13 @@ export interface FetchResult {
  * - Incremental updates: only fetch new slots since the last cached head
  * - Heavy aggregation moved to a Web Worker so the main thread stays responsive
  * - AbortController everywhere to cancel stale requests when the user changes parameters
+ * - Staleness detection via MAX_CACHE_AGE_MS (6h) so very old baselines are flagged
  */
 export function useBeaconGraffiti() {
   // ---------------------------------------------------------------------------
   // Initial state: try to show previous result instantly using the tiny quick cache.
   // This is what makes returning visitors see data with zero loading time.
+  // We also compute isStale immediately for the banner.
   // ---------------------------------------------------------------------------
   const [result, setResult] = useState<FetchResult>(() => {
     const quick = loadQuickResult()
@@ -95,6 +112,7 @@ export function useBeaconGraffiti() {
         cachedAt: quick.cachedAt,
         lastHeadSlot: quick.lastHeadSlot,
         newSlotsAvailable: 0,
+        isStale: isCacheStale(quick.cachedAt),
       }
     }
     return {
@@ -110,6 +128,7 @@ export function useBeaconGraffiti() {
       cachedAt: null,
       lastHeadSlot: null,
       newSlotsAvailable: 0,
+      isStale: false,
     }
   })
 
@@ -145,6 +164,7 @@ export function useBeaconGraffiti() {
             progress: 100,
             error: null,
             isFromCache: false,
+            isStale: isCacheStale(prev.cachedAt),
           }
 
           // Persist a tiny snapshot so the next visit is instant.
@@ -166,6 +186,7 @@ export function useBeaconGraffiti() {
           ...prev,
           loading: false,
           error: message.error || 'Worker aggregation failed',
+          isStale: false,
         }))
       }
     }
@@ -176,6 +197,7 @@ export function useBeaconGraffiti() {
         ...prev,
         loading: false,
         error: 'Aggregation worker crashed',
+        isStale: false,
       }))
     }
 
@@ -199,6 +221,7 @@ export function useBeaconGraffiti() {
     totalSlotsRequested: number
     lastHeadSlot: number
     cachedAt?: number
+    isStale?: boolean
   }) => {
     const worker = workerRef.current
 
@@ -213,6 +236,7 @@ export function useBeaconGraffiti() {
         progress: 100,
         lastHeadSlot: meta.lastHeadSlot,
         cachedAt: meta.cachedAt ?? Date.now(),
+        isStale: meta.isStale ?? isCacheStale(meta.cachedAt),
       }))
       return
     }
@@ -232,6 +256,7 @@ export function useBeaconGraffiti() {
   // ---------------------------------------------------------------------------
   // On first mount, if we have a full cached window, start aggregating it
   // immediately in the background. This is what gives "instant" results.
+  // We pass the staleness flag so the UI can warn immediately.
   // ---------------------------------------------------------------------------
   useEffect(() => {
     const cached = loadCachedWindow()
@@ -240,6 +265,7 @@ export function useBeaconGraffiti() {
         totalSlotsRequested: cached.windowSize,
         lastHeadSlot: cached.lastHeadSlot,
         cachedAt: cached.cachedAt,
+        isStale: isCacheStale(cached.cachedAt),
       })
     }
   }, [aggregateViaWorker])
@@ -250,6 +276,7 @@ export function useBeaconGraffiti() {
   // - Tries to do a cheap delta update when possible.
   // - Persists the new full window.
   // - Hands the records off to the worker for aggregation.
+  // Fresh loads are never stale.
   // ---------------------------------------------------------------------------
   const load = useCallback(async (slotCount: number, forceFullRefresh = false) => {
     // Cancel any previous in-flight request (user changed slot count, etc.)
@@ -265,6 +292,7 @@ export function useBeaconGraffiti() {
       progress: 0,
       totalSlotsRequested: slotCount,
       isFromCache: false,
+      isStale: false, // we are fetching fresh data right now
     }))
 
     try {
@@ -388,6 +416,7 @@ export function useBeaconGraffiti() {
         totalSlotsRequested: slotCount,
         lastHeadSlot: currentHeadSlot,
         cachedAt: toCache.cachedAt,
+        isStale: false, // freshly fetched
       })
     } catch (err: any) {
       if (err instanceof Error && err.name === 'AbortError') return
@@ -395,6 +424,7 @@ export function useBeaconGraffiti() {
         ...prev,
         loading: false,
         error: err.message || 'Failed to load graffiti data',
+        isStale: false,
       }))
     }
   }, [aggregateViaWorker])
@@ -437,6 +467,7 @@ export function useBeaconGraffiti() {
       cachedAt: null,
       lastHeadSlot: null,
       newSlotsAvailable: 0,
+      isStale: false,
     })
   }, [])
 
