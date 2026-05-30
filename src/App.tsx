@@ -4,7 +4,7 @@ import { StatsCards } from './components/StatsCards'
 import { LeaderboardTable } from './components/LeaderboardTable'
 import { PulseChainLogo } from './components/PulseChainLogo'
 import ErrorBoundary from './components/ErrorBoundary'
-import { RefreshCw, AlertCircle, Database, Cpu, AlertTriangle } from 'lucide-react'
+import { RefreshCw, AlertCircle, Database, Cpu, X, AlertTriangle } from 'lucide-react'
 
 function formatRelativeTime(timestamp: number | null): string {
   if (!timestamp) return ''
@@ -19,6 +19,7 @@ function formatRelativeTime(timestamp: number | null): string {
 function App() {
   const { result, load, checkForUpdates, clearCache } = useBeaconGraffiti()
   const [slotCount, setSlotCount] = useState(300)
+  const [searchTerm, setSearchTerm] = useState('')
 
   // Only check for new slots when the browser tab is visible.
   // This avoids wasting requests while the user is on another tab.
@@ -43,7 +44,13 @@ function App() {
   }, [result.lastHeadSlot, checkForUpdates])
 
   const handleLoad = (forceFull = false) => {
+    setSearchTerm('') // clear filter on new load
     load(slotCount, forceFull)
+  }
+
+  const handleClearCache = () => {
+    setSearchTerm('')
+    clearCache()
   }
 
   const loadingMessage = result.loading
@@ -51,6 +58,11 @@ function App() {
       ? `Fetching new blocks... ${result.progress}%`
       : 'Aggregating graffiti data in background...'
     : ''
+
+  const trimmedSearch = searchTerm.trim()
+  const displayedEntries = trimmedSearch
+    ? result.entries.filter(e => e.graffiti.toLowerCase().includes(trimmedSearch.toLowerCase()))
+    : result.entries
 
   // Stale cache banner takes precedence in styling
   const showCacheBanner = result.isFromCache && result.cachedAt
@@ -79,7 +91,7 @@ function App() {
             </p>
           </div>
 
-          {/* Cache status banner - enhanced with staleness warning */}
+          {/* Cache status banner - enhanced with staleness warning (takes precedence when stale) */}
           {showCacheBanner && (
             <div className={`mb-6 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-sm ${isStale 
               ? 'border-amber-900/60 bg-amber-950/60 text-amber-300' 
@@ -159,7 +171,7 @@ function App() {
 
               {result.cachedAt && (
                 <button
-                  onClick={clearCache}
+                  onClick={handleClearCache}
                   className="flex items-center gap-2 border border-zinc-800 hover:bg-zinc-950 px-3 py-2.5 rounded text-sm text-zinc-400 transition-colors"
                 >
                   Clear cache
@@ -195,14 +207,34 @@ function App() {
             <>
               <StatsCards result={result} />
 
-              <div className="mb-3 flex items-baseline justify-between">
+              <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="text-sm font-medium text-zinc-300">Top Graffiti (real beacon data)</div>
-                <div className="text-xs text-zinc-500">
-                  Sorted by frequency • Empty graffiti filtered
+                <div className="flex items-center gap-2">
+                  <input
+                    type="text"
+                    value={searchTerm}
+                    onChange={(e) => setSearchTerm(e.target.value)}
+                    placeholder="Filter graffiti (e.g. pulse, pls, love...)"
+                    className="w-full sm:w-72 bg-black border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-[#FF00AA] placeholder:text-zinc-600"
+                  />
+                  {trimmedSearch && (
+                    <button
+                      onClick={() => setSearchTerm('')}
+                      className="flex items-center gap-1 px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 border border-zinc-800 rounded hover:bg-zinc-950 transition-colors"
+                      title="Clear filter"
+                    >
+                      <X className="w-3 h-3" /> Clear
+                    </button>
+                  )}
                 </div>
               </div>
+              {trimmedSearch && (
+                <div className="text-[10px] text-zinc-500 -mt-1 mb-2">
+                  Showing {displayedEntries.length} of {result.entries.length} matching “{trimmedSearch}”
+                </div>
+              )}
 
-              <LeaderboardTable entries={result.entries} />
+              <LeaderboardTable entries={displayedEntries} searchTerm={trimmedSearch || undefined} />
             </>
           )}
 
