@@ -1,20 +1,15 @@
-// The logo file is currently located at:
-// src/LogoTransparent.png
-// (relative to this component: ../LogoTransparent.png)
-import logoSrc from '../LogoTransparent.png';
-
 interface PulseChainLogoProps {
   className?: string;
   size?: number;
 }
 
 /**
- * PulseChain / ValidatorStore logo (bundled locally)
+ * PulseChain / ValidatorStore logo (served from /public)
  */
 export function PulseChainLogo({ className = '', size = 40 }: PulseChainLogoProps) {
   return (
     <img
-      src={logoSrc}
+      src="/LogoTransparent.png"
       alt="PulseChain Logo"
       width={size}
       height={size}
