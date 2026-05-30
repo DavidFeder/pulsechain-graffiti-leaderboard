@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import { useState } from 'react'
 import { GraffitiEntry } from '../hooks/useBeaconGraffiti'
 import { Copy, Check } from 'lucide-react'
 
