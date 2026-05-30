@@ -68,6 +68,9 @@ function App() {
   const showCacheBanner = result.isFromCache && result.cachedAt
   const isStale = result.isStale
 
+  // Post-merge resolution (PR #2 vs PR #3): this file now contains both the staleness warning banner
+  // (isStale + amber AlertTriangle styling) AND the search/filter + per-row copy functionality.
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#ededed]">
       <div className="max-w-5xl mx-auto px-6 py-10">
