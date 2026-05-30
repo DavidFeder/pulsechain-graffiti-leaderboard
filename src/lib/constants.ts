@@ -12,8 +12,12 @@ export const STORAGE_KEY = 'pls-graffiti-leaderboard-v1'
 export const QUICK_CACHE_KEY = 'pls-graffiti-quick-v1'
 
 /**
- * Intended future use: if the full cache is older than this, we may decide
- * to do a full refresh instead of a delta update.
- * Currently unused but kept so the constant is defined in one place.
+ * Staleness threshold for cached data.
+ *
+ * If the last full window or quick snapshot is older than this, we mark
+ * the result as stale in the UI. This prevents serving potentially
+ * misleading "delta updated" aggregates from a very old baseline.
+ *
+ * Currently 6 hours. Used by useBeaconGraffiti for the isStale flag.
  */
 export const MAX_CACHE_AGE_MS = 1000 * 60 * 60 * 6 // 6 hours
