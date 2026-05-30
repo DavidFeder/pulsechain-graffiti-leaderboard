@@ -4,7 +4,7 @@ import { StatsCards } from './components/StatsCards'
 import { LeaderboardTable } from './components/LeaderboardTable'
 import { PulseChainLogo } from './components/PulseChainLogo'
 import ErrorBoundary from './components/ErrorBoundary'
-import { RefreshCw, AlertCircle, Database, Cpu } from 'lucide-react'
+import { RefreshCw, AlertCircle, Database, Cpu, AlertTriangle } from 'lucide-react'
 
 function formatRelativeTime(timestamp: number | null): string {
   if (!timestamp) return ''
@@ -52,6 +52,10 @@ function App() {
       : 'Aggregating graffiti data in background...'
     : ''
 
+  // Stale cache banner takes precedence in styling
+  const showCacheBanner = result.isFromCache && result.cachedAt
+  const isStale = result.isStale
+
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#ededed]">
       <div className="max-w-5xl mx-auto px-6 py-10">
@@ -75,17 +79,20 @@ function App() {
             </p>
           </div>
 
-          {/* Cache status banner */}
-          {result.isFromCache && result.cachedAt && (
-            <div className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-zinc-800 bg-zinc-950 px-4 py-3 text-sm">
-              <div className="flex items-center gap-2 text-[#FF00AA]">
-                <Database className="h-4 w-4" />
-                <span>Loaded from cache</span>
+          {/* Cache status banner - enhanced with staleness warning */}
+          {showCacheBanner && (
+            <div className={`mb-6 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-sm ${isStale 
+              ? 'border-amber-900/60 bg-amber-950/60 text-amber-300' 
+              : 'border-zinc-800 bg-zinc-950'}`}>
+              <div className={`flex items-center gap-2 ${isStale ? 'text-amber-400' : 'text-[#FF00AA]'}`}>
+                {isStale ? <AlertTriangle className="h-4 w-4" /> : <Database className="h-4 w-4" />}
+                <span className="font-medium">{isStale ? 'Cache is stale' : 'Loaded from cache'}</span>
               </div>
-              <div className="text-zinc-400">
+              <div className={isStale ? 'text-amber-300/80' : 'text-zinc-400'}>
                 Last synced {formatRelativeTime(result.cachedAt)} • up to slot {result.lastHeadSlot?.toLocaleString()}
+                {isStale && <span className="ml-1.5 font-medium">(older than 6 hours — full refresh recommended)</span>}
               </div>
-              {result.newSlotsAvailable > 0 && (
+              {result.newSlotsAvailable > 0 && !isStale && (
                 <div className="ml-auto rounded bg-[#FF00AA]/10 px-3 py-1 text-xs font-medium text-[#FF00AA]">
                   {result.newSlotsAvailable} new slots since last visit
                 </div>
@@ -138,11 +145,13 @@ function App() {
                 )}
               </button>
 
-              {result.isFromCache && (
+              {(result.isFromCache || isStale) && (
                 <button
                   onClick={() => handleLoad(true)}
                   disabled={result.loading}
-                  className="flex items-center gap-2 border border-zinc-700 hover:bg-zinc-900 px-4 py-2.5 rounded text-sm transition-colors"
+                  className={`flex items-center gap-2 border px-4 py-2.5 rounded text-sm transition-colors ${isStale 
+                    ? 'border-amber-700 hover:bg-amber-950 text-amber-300' 
+                    : 'border-zinc-700 hover:bg-zinc-900'}`}
                 >
                   Full refresh
                 </button>
