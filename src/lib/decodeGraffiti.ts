@@ -1,5 +1,3 @@
-import { isEmptyGraffiti } from './aggregateGraffiti'
-
 /**
  * Decodes the 32-byte `graffiti` field from a beacon block (body.graffiti).
  *
