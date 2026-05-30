@@ -1,15 +1,32 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { GraffitiEntry } from '../hooks/useBeaconGraffiti'
+import { Copy, Check } from 'lucide-react'
 
 interface Props {
   entries: GraffitiEntry[]
+  searchTerm?: string
 }
 
-export function LeaderboardTable({ entries }: Props) {
+export function LeaderboardTable({ entries, searchTerm }: Props) {
+  const [copiedGraffiti, setCopiedGraffiti] = useState<string | null>(null)
+
+  const copyToClipboard = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text)
+      setCopiedGraffiti(text)
+      // Reset feedback after a short delay
+      setTimeout(() => setCopiedGraffiti(null), 1400)
+    } catch {
+      // Clipboard API not available (very old browsers) — fallback to nothing
+    }
+  }
+
   if (entries.length === 0) {
     return (
       <div className="text-center py-12 text-zinc-500">
-        No graffiti found in the selected range.
+        {searchTerm 
+          ? `No matches for “${searchTerm}”.` 
+          : 'No graffiti found in the selected range.'}
       </div>
     )
   }
@@ -67,28 +84,45 @@ export function LeaderboardTable({ entries }: Props) {
           </tr>
         </thead>
         <tbody>
-          {entries.map((entry, index) => (
-            <tr key={index}>
-              <td className="pl-16">
-                <div className="flex items-center gap-2">
-                  {getMetalBadge(index) || (
-                    <div className="ml-4 flex h-7 w-7 items-center justify-center font-mono text-zinc-500 text-[11px]">
-                      {index + 1}
-                    </div>
-                  )}
-                </div>
-              </td>
-              <td>
-                <code className="graffiti-cell bg-zinc-950 px-2 py-1 rounded text-[#FF00AA] text-[13px]">
-                  {entry.graffiti}
-                </code>
-              </td>
-              <td className="text-right font-medium tabular-nums">{entry.count}</td>
-              <td className="text-right font-mono text-zinc-400">
-                {entry.percentage.toFixed(1)}%
-              </td>
-            </tr>
-          ))}
+          {entries.map((entry, index) => {
+            const isCopied = copiedGraffiti === entry.graffiti
+            return (
+              <tr key={index}>
+                <td className="pl-16">
+                  <div className="flex items-center gap-2">
+                    {getMetalBadge(index) || (
+                      <div className="ml-4 flex h-7 w-7 items-center justify-center font-mono text-zinc-500 text-[11px]">
+                        {index + 1}
+                      </div>
+                    )}
+                  </div>
+                </td>
+                <td>
+                  <div className="flex items-center gap-2 group">
+                    <code className="graffiti-cell bg-zinc-950 px-2 py-1 rounded text-[#FF00AA] text-[13px]">
+                      {entry.graffiti}
+                    </code>
+                    <button
+                      onClick={() => copyToClipboard(entry.graffiti)}
+                      className="p-1 rounded text-zinc-500 hover:text-[#FF00AA] hover:bg-zinc-900 transition-colors opacity-60 group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-[#FF00AA]/40"
+                      title="Copy graffiti to clipboard"
+                      aria-label={`Copy “${entry.graffiti}” to clipboard`}
+                    >
+                      {isCopied ? (
+                        <Check className="w-3.5 h-3.5 text-emerald-400" />
+                      ) : (
+                        <Copy className="w-3.5 h-3.5" />
+                      )}
+                    </button>
+                  </div>
+                </td>
+                <td className="text-right font-medium tabular-nums">{entry.count}</td>
+                <td className="text-right font-mono text-zinc-400">
+                  {entry.percentage.toFixed(1)}%
+                </td>
+              </tr>
+            )
+          })}
         </tbody>
       </table>
     </div>
