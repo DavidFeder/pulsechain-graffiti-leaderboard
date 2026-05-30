@@ -60,6 +60,14 @@ function App() {
     clearCache()
   }
 
+  // When user clicks one of the preset buttons (100/300/500),
+  // immediately load with the new slot count.
+  const handlePresetSlotCount = (n: number) => {
+    setSlotCount(n)
+    setSearchTerm('')
+    load(n, false)
+  }
+
   const loadingMessage = result.loading
     ? result.progress < 100 && result.progress > 0
       ? `Fetching new blocks... ${result.progress}%`
@@ -130,7 +138,7 @@ function App() {
                 {[100, 300, 500].map(n => (
                   <button
                     key={n}
-                    onClick={() => setSlotCount(n)}
+                    onClick={() => handlePresetSlotCount(n)}
                     className={`px-4 py-2 text-sm rounded border transition-colors ${slotCount === n 
                       ? 'bg-white text-black border-white' 
                       : 'border-zinc-700 hover:bg-zinc-900'}`}
