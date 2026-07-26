@@ -1,23 +1,27 @@
-## PulseChain Validator Graffiti Leaderboard
+# PulseChain Graffiti Leaderboard
 
-**Live Demo:** [leaderboard.validatorstore.com](https://leaderboard.validatorstore.com)
+**Live:** [leaderboard.validatorstore.com](https://leaderboard.validatorstore.com)
 
-Real beacon chain graffiti leaderboard. Shows the most popular graffiti messages set by validators on the PulseChain network.
+Real beacon chain graffiti leaderboard for PulseChain. Shows the most popular graffiti messages set by validators over the last **500 slots**.
 
-### Live Site
-
-→ **[View the Leaderboard](https://leaderboard.validatorstore.com)**
+---
 
 ### Features
 
-- Uses real beacon chain graffiti data (not execution layer `extraData`)
-- Fast local caching with incremental updates
-- Runs entirely in the browser
-- Good Windows support
+- Real **beacon chain** graffiti (not execution-layer `extraData`)
+- Fixed 500-slot sliding window (fast + reliable on public endpoints)
+- Two-tier local caching for instant return visits
+- Incremental updates (only fetches new slots since last visit)
+- Web Worker aggregation so the UI stays responsive
+- Same-origin proxy for the beacon API (avoids CORS issues)
+- Copy-to-clipboard on every graffiti entry
+- Search / filter
+- Vercel Analytics + Speed Insights
+- Strong security headers (CSP, COOP, HSTS, etc.)
 
-### For Developers
+---
 
-#### Quick Start
+### Quick Start
 
 ```bash
 git clone https://github.com/DavidFeder/pulsechain-graffiti-leaderboard.git
@@ -26,33 +30,48 @@ npm install
 npm run dev
 ```
 
-Open http://localhost:5173
+Open [http://localhost:5173](http://localhost:5173)
 
-#### Running on Windows
+#### Scripts
 
-1. Install [Node.js (LTS)](https://nodejs.org) and [Git for Windows](https://git-scm.com/download/win)
-2. Open PowerShell or Command Prompt
-3. Run the commands above
+| Command              | Description                    |
+|----------------------|--------------------------------|
+| `npm run dev`        | Start development server       |
+| `npm run build`      | Type-check + production build  |
+| `npm run preview`    | Preview production build       |
+| `npm run lint`       | Run ESLint                     |
+| `npm run format`     | Format with Prettier           |
 
-**Important**: After installing Node.js, **close and reopen** your terminal before running `npm install`.
+---
 
-**Easiest install method**:
-```powershell
-winget install OpenJS.NodeJS.LTS
-```
+### Architecture
 
-Then close and reopen PowerShell, navigate to the folder, and run `npm install`.
+- **Two-tier caching**
+  - Tiny “quick” snapshot in `localStorage` → instant first paint for returning visitors
+  - Full 500-slot window of raw records → correct incremental updates
 
-#### Architecture
+- **Same-origin proxy**  
+  Browser calls `/api/beacon/*` → Vercel rewrites to the public beacon API.  
+  This eliminates CORS problems that most public beacon endpoints have.
 
-- **Two-tier caching**: A small "quick" snapshot is used for instant first paint. A larger sliding window of raw records is kept for correct incremental updates.
-- **Web Worker**: Heavy aggregation (counting + sorting) runs off the main thread so the UI stays responsive even on slower machines.
-- **Incremental fetching**: On subsequent loads we only request new slots since the last cached head instead of re-fetching everything.
-- **AbortController**: Every network request is cancellable.
+- **Web Worker**  
+  Counting and sorting run off the main thread.
 
-#### Tech
+- **Incremental fetching**  
+  After the first load we only request new slots since the last cached head.
 
-- Vite + React 18 + TypeScript + Tailwind
-- Pure client-side (no backend)
+- **AbortController**  
+  In-flight requests are cancelled when the user triggers a new load.
 
-Built for the PulseChain community.
+---
+
+### Tech Stack
+
+- Vite + React 18 + TypeScript + Tailwind CSS
+- `@vitejs/plugin-react-swc` for fast builds
+- Vercel (hosting + analytics + edge proxy)
+- Pure client-side — no custom backend
+
+---
+
+Built for the PulseChain community by [ValidatorStore](https://validatorstore.com).
