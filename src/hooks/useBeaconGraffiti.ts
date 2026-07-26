@@ -1,6 +1,4 @@
 import { useState, useCallback, useEffect, useRef } from 'react'
-import { decodeGraffiti } from '../lib/decodeGraffiti'
-import { fetchWithConcurrencyLimit } from '../utils/concurrency'
 import {
   saveCachedWindow,
   loadCachedWindow,
@@ -10,10 +8,10 @@ import {
 import { computeLeaderboard } from '../lib/aggregateGraffiti'
 import type { WorkerRequest, WorkerResponse } from '../lib/aggregateGraffiti'
 import { CONCURRENCY, MAX_CACHE_AGE_MS } from '../lib/constants'
-import { fetchWithRetry } from '../utils/retry'
-import type { FetchResult } from '../lib/beacon/types'
+import type { FetchResult, GraffitiRecord } from '../lib/beacon/types'
 import { saveQuickResult, loadQuickResult, clearQuickResult } from '../lib/cache/quickCache'
 import { resolveWorkingEndpoint, friendlyErrorMessage } from '../lib/beacon/endpoints'
+import { fetchHeadSlot, fetchBlockRecords } from '../lib/beacon/fetchBlocks'
 
 // Re-export types so existing imports from the hook keep working
 export type { GraffitiEntry, FetchResult } from '../lib/beacon/types'
@@ -168,7 +166,7 @@ export function useBeaconGraffiti() {
   // ---------------------------------------------------------------------------
   // Aggregation helper (prefers worker, falls back to main thread).
   // ---------------------------------------------------------------------------
-  const aggregateViaWorker = useCallback((records: Array<{ slot: number; graffiti: string }>, meta: {
+  const aggregateViaWorker = useCallback((records: GraffitiRecord[], meta: {
     totalSlotsRequested: number
     lastHeadSlot: number
     cachedAt?: number
@@ -254,19 +252,15 @@ export function useBeaconGraffiti() {
         workingEndpointRef.current = base
       }
 
-      // Get the latest head slot (with retry + abort support)
-      const headRes = await fetchWithRetry(
-        `${base}/eth/v1/beacon/headers/head`,
-        { signal },
-        2
-      )
-      if (!headRes.ok) throw new Error('Failed to fetch head slot from beacon API')
-
-      const headData = await headRes.json()
-      const currentHeadSlot: number = Number(headData.data.header.message.slot)
+      const currentHeadSlot = await fetchHeadSlot(base, signal)
 
       const cached = !forceFullRefresh ? loadCachedWindow() : null
-      let records: Array<{ slot: number; graffiti: string }> = []
+      let records: GraffitiRecord[] = []
+
+      const onProgress = (completed: number, total: number) => {
+        const p = total > 0 ? Math.round((completed / total) * 100) : 0
+        setResult(prev => ({ ...prev, progress: p }))
+      }
 
       // -----------------------------------------------------------------------
       // Happy path: we have a previous window of the exact same size.
@@ -279,40 +273,16 @@ export function useBeaconGraffiti() {
         if (delta > 0) {
           const newSlots = Array.from({ length: delta }, (_, i) => lastKnown + 1 + i)
 
-          let completed = 0
-          const newRecords = await fetchWithConcurrencyLimit(
-            newSlots,
-            async (slot, _index, fetchSignal) => {
-              try {
-                const res = await fetchWithRetry(
-                  `${base}/eth/v2/beacon/blocks/${slot}`,
-                  { signal: fetchSignal },
-                  1
-                )
-                if (!res.ok) return null
-
-                const block = await res.json()
-                const g = decodeGraffiti(block?.data?.message?.body?.graffiti)
-
-                completed++
-                const p = Math.round((completed / delta) * 100)
-                setResult(prev => ({ ...prev, progress: p }))
-
-                return { slot, graffiti: g }
-              } catch (err) {
-                if (err instanceof Error && err.name === 'AbortError') return null
-                completed++
-                return null
-              }
-            },
-            CONCURRENCY,
-            signal
-          )
+          const newRecords = await fetchBlockRecords(base, newSlots, {
+            concurrency: CONCURRENCY,
+            signal,
+            onProgress,
+          })
 
           // Keep old records that are still inside the requested window
           const cutoffSlot = currentHeadSlot - slotCount + 1
           const survivingOld = cached.records.filter(r => r.slot >= cutoffSlot)
-          records = [...survivingOld, ...newRecords.filter(Boolean) as Array<{ slot: number; graffiti: string }>]
+          records = [...survivingOld, ...newRecords]
         } else {
           // No new blocks since last visit — just reuse what we have
           records = cached.records
@@ -323,36 +293,11 @@ export function useBeaconGraffiti() {
         // -------------------------------------------------------------------
         const slots = Array.from({ length: slotCount }, (_, i) => currentHeadSlot - i)
 
-        let completed = 0
-        const fetched = await fetchWithConcurrencyLimit(
-          slots,
-          async (slot, _index, fetchSignal) => {
-            try {
-              const res = await fetchWithRetry(
-                `${base}/eth/v2/beacon/blocks/${slot}`,
-                { signal: fetchSignal },
-                1
-              )
-              if (!res.ok) return null
-
-              const block = await res.json()
-              const g = decodeGraffiti(block?.data?.message?.body?.graffiti)
-
-              completed++
-              const p = Math.round((completed / slotCount) * 100)
-              setResult(prev => ({ ...prev, progress: p }))
-
-              return { slot, graffiti: g }
-            } catch (err) {
-              if (err instanceof Error && err.name === 'AbortError') return null
-              completed++
-              return null
-            }
-          },
-          CONCURRENCY,
-          signal
-        )
-        records = fetched.filter(Boolean) as Array<{ slot: number; graffiti: string }>
+        records = await fetchBlockRecords(base, slots, {
+          concurrency: CONCURRENCY,
+          signal,
+          onProgress,
+        })
       }
 
       // Final safety trim to exactly the requested window size
@@ -404,8 +349,7 @@ export function useBeaconGraffiti() {
         workingEndpointRef.current = base
       }
 
-      const headRes = await fetchWithRetry(`${base}/eth/v1/beacon/headers/head`, {}, 1)
-      const headSlot = Number((await headRes.json()).data.header.message.slot)
+      const headSlot = await fetchHeadSlot(base)
       const delta = headSlot - cached.lastHeadSlot
       const newDelta = Math.max(0, delta)
 
