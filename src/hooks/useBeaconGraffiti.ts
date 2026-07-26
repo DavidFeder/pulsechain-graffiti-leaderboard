@@ -11,6 +11,10 @@ import { computeLeaderboard } from '../lib/aggregateGraffiti'
 import type { WorkerRequest, WorkerResponse } from '../lib/aggregateGraffiti'
 import { BEACON_API_ENDPOINTS, CONCURRENCY, QUICK_CACHE_KEY, MAX_CACHE_AGE_MS } from '../lib/constants'
 import { fetchWithRetry } from '../utils/retry'
+import type { FetchResult, GraffitiEntry, QuickCacheSnapshot } from '../lib/beacon/types'
+
+// Re-export types so existing imports from the hook keep working
+export type { GraffitiEntry, FetchResult } from '../lib/beacon/types'
 
 // ---------------------------------------------------------------------------
 // Endpoint selection with simple failover
@@ -61,18 +65,13 @@ function friendlyErrorMessage(err: unknown): string {
 
 // Quick cache is a tiny snapshot used purely for instant UI on returning visitors.
 // It is intentionally separate from the full record cache.
-function saveQuickResult(data: {
-  entries: GraffitiEntry[]
-  totalSlotsRequested: number
-  cachedAt: number
-  lastHeadSlot: number
-}) {
+function saveQuickResult(data: QuickCacheSnapshot) {
   try {
     localStorage.setItem(QUICK_CACHE_KEY, JSON.stringify(data))
   } catch {}
 }
 
-function loadQuickResult() {
+function loadQuickResult(): QuickCacheSnapshot | null {
   try {
     const raw = localStorage.getItem(QUICK_CACHE_KEY)
     return raw ? JSON.parse(raw) : null
@@ -95,36 +94,6 @@ function clearQuickResult() {
 function isCacheStale(cachedAt: number | null | undefined): boolean {
   if (!cachedAt) return false
   return Date.now() - cachedAt > MAX_CACHE_AGE_MS
-}
-
-// =============================================================================
-// TYPES
-// =============================================================================
-
-export interface GraffitiEntry {
-  graffiti: string
-  count: number
-  percentage: number
-}
-
-export interface FetchResult {
-  entries: GraffitiEntry[]
-  totalSlotsRequested: number
-  totalSlotsFetched: number
-  slotsWithGraffiti: number
-  uniqueGraffiti: number
-  loading: boolean
-  progress: number
-  error: string | null
-  isFromCache: boolean
-  cachedAt: number | null
-  lastHeadSlot: number | null
-  newSlotsAvailable: number
-  /**
-   * True when the underlying cache (quick or full window) is older than MAX_CACHE_AGE_MS.
-   * UI should show a warning and encourage a Full refresh.
-   */
-  isStale: boolean
 }
 
 /**
@@ -411,7 +380,7 @@ export function useBeaconGraffiti() {
           // Keep old records that are still inside the requested window
           const cutoffSlot = currentHeadSlot - slotCount + 1
           const survivingOld = cached.records.filter(r => r.slot >= cutoffSlot)
-          records = [...survivingOld, ...newRecords.filter(Boolean) as any]
+          records = [...survivingOld, ...newRecords.filter(Boolean) as Array<{ slot: number; graffiti: string }>]
         } else {
           // No new blocks since last visit — just reuse what we have
           records = cached.records
@@ -451,7 +420,7 @@ export function useBeaconGraffiti() {
           CONCURRENCY,
           signal
         )
-        records = fetched.filter(Boolean) as any
+        records = fetched.filter(Boolean) as Array<{ slot: number; graffiti: string }>
       }
 
       // Final safety trim to exactly the requested window size
@@ -475,7 +444,7 @@ export function useBeaconGraffiti() {
         cachedAt: toCache.cachedAt,
         isStale: false, // freshly fetched
       })
-    } catch (err: any) {
+    } catch (err: unknown) {
       if (err instanceof Error && err.name === 'AbortError') return
       // Clear cached endpoint so next attempt re-probes
       workingEndpointRef.current = null
