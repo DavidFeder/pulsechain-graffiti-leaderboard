@@ -9,60 +9,14 @@ import {
 } from '../lib/storage'
 import { computeLeaderboard } from '../lib/aggregateGraffiti'
 import type { WorkerRequest, WorkerResponse } from '../lib/aggregateGraffiti'
-import { BEACON_API_ENDPOINTS, CONCURRENCY, MAX_CACHE_AGE_MS } from '../lib/constants'
+import { CONCURRENCY, MAX_CACHE_AGE_MS } from '../lib/constants'
 import { fetchWithRetry } from '../utils/retry'
 import type { FetchResult } from '../lib/beacon/types'
 import { saveQuickResult, loadQuickResult, clearQuickResult } from '../lib/cache/quickCache'
+import { resolveWorkingEndpoint, friendlyErrorMessage } from '../lib/beacon/endpoints'
 
 // Re-export types so existing imports from the hook keep working
 export type { GraffitiEntry, FetchResult } from '../lib/beacon/types'
-
-// ---------------------------------------------------------------------------
-// Endpoint selection with simple failover
-// ---------------------------------------------------------------------------
-
-/** Returns the first endpoint that successfully answers a head request. */
-async function resolveWorkingEndpoint(signal?: AbortSignal): Promise<string> {
-  let lastError: unknown = null
-
-  for (const endpoint of BEACON_API_ENDPOINTS) {
-    try {
-      const res = await fetchWithRetry(
-        `${endpoint}/eth/v1/beacon/headers/head`,
-        { signal },
-        1
-      )
-      if (res.ok) return endpoint
-    } catch (err) {
-      lastError = err
-      // try next
-    }
-  }
-
-  throw lastError instanceof Error
-    ? lastError
-    : new Error('All beacon API endpoints failed')
-}
-
-/** Turn low-level fetch errors into clearer user-facing messages. */
-function friendlyErrorMessage(err: unknown): string {
-  if (!(err instanceof Error)) return 'Failed to load graffiti data'
-
-  const msg = err.message.toLowerCase()
-
-  if (err.name === 'AbortError') return '' // handled by caller
-  if (msg.includes('networkerror') || msg.includes('failed to fetch') || msg.includes('network request failed')) {
-    return 'Network error — the public beacon API may be rate-limited or temporarily unavailable. Try again in a moment.'
-  }
-  if (msg.includes('all beacon api endpoints failed')) {
-    return 'All known beacon API endpoints are currently unreachable. Please try again later.'
-  }
-  if (msg.includes('failed to fetch head')) {
-    return 'Could not reach the beacon API. It may be rate-limited — please wait a few seconds and try again.'
-  }
-
-  return err.message || 'Failed to load graffiti data'
-}
 
 /**
  * Returns true if the given timestamp is older than MAX_CACHE_AGE_MS.
