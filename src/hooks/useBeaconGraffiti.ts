@@ -9,8 +9,35 @@ import {
 } from '../lib/storage'
 import { computeLeaderboard } from '../lib/aggregateGraffiti'
 import type { WorkerRequest, WorkerResponse } from '../lib/aggregateGraffiti'
-import { BEACON_API, CONCURRENCY, QUICK_CACHE_KEY, MAX_CACHE_AGE_MS } from '../lib/constants'
+import { BEACON_API_ENDPOINTS, CONCURRENCY, QUICK_CACHE_KEY, MAX_CACHE_AGE_MS } from '../lib/constants'
 import { fetchWithRetry } from '../utils/retry'
+
+// ---------------------------------------------------------------------------
+// Endpoint selection with simple failover
+// ---------------------------------------------------------------------------
+
+/** Returns the first endpoint that successfully answers a head request. */
+async function resolveWorkingEndpoint(signal?: AbortSignal): Promise<string> {
+  let lastError: unknown = null
+
+  for (const endpoint of BEACON_API_ENDPOINTS) {
+    try {
+      const res = await fetchWithRetry(
+        `${endpoint}/eth/v1/beacon/headers/head`,
+        { signal },
+        1
+      )
+      if (res.ok) return endpoint
+    } catch (err) {
+      lastError = err
+      // try next
+    }
+  }
+
+  throw lastError instanceof Error
+    ? lastError
+    : new Error('All beacon API endpoints failed')
+}
 
 // Quick cache is a tiny snapshot used purely for instant UI on returning visitors.
 // It is intentionally separate from the full record cache.
@@ -89,6 +116,7 @@ export interface FetchResult {
  * - Heavy aggregation moved to a Web Worker so the main thread stays responsive
  * - AbortController everywhere to cancel stale requests when the user changes parameters
  * - Staleness detection via MAX_CACHE_AGE_MS (6h) so very old baselines are flagged
+ * - Automatic failover across BEACON_API_ENDPOINTS
  */
 export function useBeaconGraffiti() {
   // ---------------------------------------------------------------------------
@@ -134,6 +162,8 @@ export function useBeaconGraffiti() {
 
   const workerRef = useRef<Worker | null>(null)
   const abortControllerRef = useRef<AbortController | null>(null)
+  // Cache the working endpoint for the lifetime of the page so we don't re-probe every request
+  const workingEndpointRef = useRef<string | null>(null)
 
   // ---------------------------------------------------------------------------
   // Web Worker initialization (runs once).
@@ -272,7 +302,7 @@ export function useBeaconGraffiti() {
 
   // ---------------------------------------------------------------------------
   // Core load function.
-  // - Always fetches current head first.
+  // - Always fetches current head first (with endpoint failover).
   // - Tries to do a cheap delta update when possible.
   // - Persists the new full window.
   // - Hands the records off to the worker for aggregation.
@@ -296,9 +326,16 @@ export function useBeaconGraffiti() {
     }))
 
     try {
+      // Resolve a working endpoint (uses cache if already known)
+      let base = workingEndpointRef.current
+      if (!base) {
+        base = await resolveWorkingEndpoint(signal)
+        workingEndpointRef.current = base
+      }
+
       // Get the latest head slot (with retry + abort support)
       const headRes = await fetchWithRetry(
-        `${BEACON_API}/eth/v1/beacon/headers/head`,
+        `${base}/eth/v1/beacon/headers/head`,
         { signal },
         2
       )
@@ -327,7 +364,7 @@ export function useBeaconGraffiti() {
             async (slot, _index, fetchSignal) => {
               try {
                 const res = await fetchWithRetry(
-                  `${BEACON_API}/eth/v2/beacon/blocks/${slot}`,
+                  `${base}/eth/v2/beacon/blocks/${slot}`,
                   { signal: fetchSignal },
                   1
                 )
@@ -371,7 +408,7 @@ export function useBeaconGraffiti() {
           async (slot, _index, fetchSignal) => {
             try {
               const res = await fetchWithRetry(
-                `${BEACON_API}/eth/v2/beacon/blocks/${slot}`,
+                `${base}/eth/v2/beacon/blocks/${slot}`,
                 { signal: fetchSignal },
                 1
               )
@@ -420,6 +457,8 @@ export function useBeaconGraffiti() {
       })
     } catch (err: any) {
       if (err instanceof Error && err.name === 'AbortError') return
+      // Clear cached endpoint so next attempt re-probes
+      workingEndpointRef.current = null
       setResult(prev => ({
         ...prev,
         loading: false,
@@ -438,7 +477,13 @@ export function useBeaconGraffiti() {
     if (!cached) return 0
 
     try {
-      const headRes = await fetchWithRetry(`${BEACON_API}/eth/v1/beacon/headers/head`, {}, 1)
+      let base = workingEndpointRef.current
+      if (!base) {
+        base = await resolveWorkingEndpoint()
+        workingEndpointRef.current = base
+      }
+
+      const headRes = await fetchWithRetry(`${base}/eth/v1/beacon/headers/head`, {}, 1)
       const headSlot = Number((await headRes.json()).data.header.message.slot)
       const delta = headSlot - cached.lastHeadSlot
       const newDelta = Math.max(0, delta)
