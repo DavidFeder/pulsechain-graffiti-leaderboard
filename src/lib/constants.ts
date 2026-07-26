@@ -1,19 +1,15 @@
-// Primary + fallback public PulseChain **Beacon API** endpoints.
-// IMPORTANT: These must support the Beacon REST API
-// (e.g. /eth/v1/beacon/headers/head and /eth/v2/beacon/blocks/{slot}).
-// Regular execution-layer RPCs (rpc.pulsechain.com, publicnode, etc.) will NOT work here.
-//
-// The first endpoint that responds successfully is used for the session.
+// Beacon API is now proxied through Vercel at /api/beacon
+// (see vercel.json rewrite → https://rpc-pulsechain.g4mm4.io/beacon-api)
+// This avoids CORS issues that public beacon endpoints often have.
 export const BEACON_API_ENDPOINTS = [
-  'https://rpc-pulsechain.g4mm4.io/beacon-api',
-  // Add more true Beacon API endpoints here when available.
+  '/api/beacon',
 ] as const
 
 /** @deprecated Prefer BEACON_API_ENDPOINTS — kept for any legacy references */
 export const BEACON_API = BEACON_API_ENDPOINTS[0]
 
 // Maximum concurrent block requests.
-// Further lowered to 6 to reduce rate-limit / NetworkError risk on public endpoints.
+// Kept low to be gentle on the upstream public endpoint.
 export const CONCURRENCY = 6
 
 // localStorage keys
