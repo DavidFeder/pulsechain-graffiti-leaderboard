@@ -9,9 +9,10 @@ import {
 } from '../lib/storage'
 import { computeLeaderboard } from '../lib/aggregateGraffiti'
 import type { WorkerRequest, WorkerResponse } from '../lib/aggregateGraffiti'
-import { BEACON_API_ENDPOINTS, CONCURRENCY, QUICK_CACHE_KEY, MAX_CACHE_AGE_MS } from '../lib/constants'
+import { BEACON_API_ENDPOINTS, CONCURRENCY, MAX_CACHE_AGE_MS } from '../lib/constants'
 import { fetchWithRetry } from '../utils/retry'
-import type { FetchResult, QuickCacheSnapshot } from '../lib/beacon/types'
+import type { FetchResult } from '../lib/beacon/types'
+import { saveQuickResult, loadQuickResult, clearQuickResult } from '../lib/cache/quickCache'
 
 // Re-export types so existing imports from the hook keep working
 export type { GraffitiEntry, FetchResult } from '../lib/beacon/types'
@@ -61,29 +62,6 @@ function friendlyErrorMessage(err: unknown): string {
   }
 
   return err.message || 'Failed to load graffiti data'
-}
-
-// Quick cache is a tiny snapshot used purely for instant UI on returning visitors.
-// It is intentionally separate from the full record cache.
-function saveQuickResult(data: QuickCacheSnapshot) {
-  try {
-    localStorage.setItem(QUICK_CACHE_KEY, JSON.stringify(data))
-  } catch {}
-}
-
-function loadQuickResult(): QuickCacheSnapshot | null {
-  try {
-    const raw = localStorage.getItem(QUICK_CACHE_KEY)
-    return raw ? JSON.parse(raw) : null
-  } catch {
-    return null
-  }
-}
-
-function clearQuickResult() {
-  try {
-    localStorage.removeItem(QUICK_CACHE_KEY)
-  } catch {}
 }
 
 /**
