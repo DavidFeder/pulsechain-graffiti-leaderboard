@@ -9,8 +9,8 @@ export const BEACON_API_ENDPOINTS = [
 export const BEACON_API = BEACON_API_ENDPOINTS[0]
 
 // Maximum concurrent block requests.
-// Kept low to be gentle on the upstream public endpoint.
-export const CONCURRENCY = 6
+// Raised back to 10 now that traffic goes through the same-origin proxy.
+export const CONCURRENCY = 10
 
 // localStorage keys
 // Full window cache (used for fast incremental updates)
