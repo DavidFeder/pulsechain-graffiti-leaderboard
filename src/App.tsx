@@ -4,7 +4,7 @@ import { StatsCards } from './components/StatsCards'
 import { LeaderboardTable } from './components/LeaderboardTable'
 import { PulseChainLogo } from './components/PulseChainLogo'
 import ErrorBoundary from './components/ErrorBoundary'
-import { RefreshCw, AlertCircle, Database, Cpu, X, AlertTriangle } from 'lucide-react'
+import { RefreshCw, AlertCircle, Database, Cpu, X, AlertTriangle, Search } from 'lucide-react'
 
 const SLOT_COUNT = 500
 
@@ -76,6 +76,7 @@ function App() {
   const showCacheBanner = result.isFromCache && result.cachedAt
   const isStale = result.isStale
   const hasResults = result.entries.length > 0 || result.totalSlotsFetched > 0
+  const noFilterMatches = hasResults && trimmedSearch && displayedEntries.length === 0
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#ededed]">
@@ -163,10 +164,21 @@ function App() {
             )}
           </div>
 
+          {/* Error state with retry */}
           {result.error && (
-            <div className="flex items-center gap-2 bg-red-950 border border-red-900 text-red-400 px-4 py-3 rounded mb-6 text-sm">
-              <AlertCircle className="w-4 h-4" />
-              {result.error}
+            <div className="flex flex-wrap items-center gap-3 bg-red-950/80 border border-red-900 text-red-300 px-4 py-3 rounded-lg mb-6 text-sm">
+              <div className="flex items-center gap-2 flex-1 min-w-0">
+                <AlertCircle className="w-4 h-4 shrink-0" />
+                <span>{result.error}</span>
+              </div>
+              <button
+                onClick={() => handleLoad(true)}
+                disabled={result.loading}
+                className="shrink-0 flex items-center gap-1.5 border border-red-800 hover:bg-red-900/50 px-3 py-1.5 rounded text-xs font-medium transition-colors disabled:opacity-50"
+              >
+                <RefreshCw className="w-3 h-3" />
+                Retry
+              </button>
             </div>
           )}
 
@@ -213,20 +225,37 @@ function App() {
                   )}
                 </div>
               </div>
-              {trimmedSearch && (
+
+              {trimmedSearch && !noFilterMatches && (
                 <div className="text-[10px] text-zinc-500 -mt-1 mb-2">
                   Showing {displayedEntries.length} of {result.entries.length} matching “{trimmedSearch}”
                 </div>
               )}
 
-              <LeaderboardTable entries={displayedEntries} searchTerm={trimmedSearch || undefined} />
+              {noFilterMatches ? (
+                <div className="text-center py-12 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
+                  <Search className="w-8 h-8 mx-auto mb-3 opacity-40" />
+                  <div className="font-medium text-zinc-400">No graffiti matched “{trimmedSearch}”</div>
+                  <div className="text-xs mt-1.5">Try a different filter or clear the search.</div>
+                  <button
+                    onClick={() => setSearchTerm('')}
+                    className="mt-4 text-xs border border-zinc-700 hover:bg-zinc-900 px-3 py-1.5 rounded transition-colors"
+                  >
+                    Clear filter
+                  </button>
+                </div>
+              ) : (
+                <LeaderboardTable entries={displayedEntries} searchTerm={trimmedSearch || undefined} />
+              )}
             </div>
           )}
 
-          {!result.loading && result.entries.length === 0 && result.totalSlotsRequested === 0 && (
+          {/* Initial empty / first-load state */}
+          {!result.loading && !hasResults && !result.error && (
             <div className="text-center py-16 text-zinc-500 border border-dashed border-zinc-800 rounded-xl">
-              Loading the leaderboard...
-              <div className="text-xs mt-2">Returning visitors get instant results thanks to localStorage + Web Worker aggregation.</div>
+              <div className="font-medium text-zinc-400 mb-1">No data yet</div>
+              <div className="text-sm">Click “Load Leaderboard” to fetch the latest graffiti from the beacon chain.</div>
+              <div className="text-xs mt-3 text-zinc-600">Returning visitors get instant results from local cache.</div>
             </div>
           )}
 
