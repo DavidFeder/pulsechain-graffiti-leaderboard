@@ -39,6 +39,26 @@ async function resolveWorkingEndpoint(signal?: AbortSignal): Promise<string> {
     : new Error('All beacon API endpoints failed')
 }
 
+/** Turn low-level fetch errors into clearer user-facing messages. */
+function friendlyErrorMessage(err: unknown): string {
+  if (!(err instanceof Error)) return 'Failed to load graffiti data'
+
+  const msg = err.message.toLowerCase()
+
+  if (err.name === 'AbortError') return '' // handled by caller
+  if (msg.includes('networkerror') || msg.includes('failed to fetch') || msg.includes('network request failed')) {
+    return 'Network error — the public beacon API may be rate-limited or temporarily unavailable. Try again in a moment.'
+  }
+  if (msg.includes('all beacon api endpoints failed')) {
+    return 'All known beacon API endpoints are currently unreachable. Please try again later.'
+  }
+  if (msg.includes('failed to fetch head')) {
+    return 'Could not reach the beacon API. It may be rate-limited — please wait a few seconds and try again.'
+  }
+
+  return err.message || 'Failed to load graffiti data'
+}
+
 // Quick cache is a tiny snapshot used purely for instant UI on returning visitors.
 // It is intentionally separate from the full record cache.
 function saveQuickResult(data: {
@@ -462,7 +482,7 @@ export function useBeaconGraffiti() {
       setResult(prev => ({
         ...prev,
         loading: false,
-        error: err.message || 'Failed to load graffiti data',
+        error: friendlyErrorMessage(err),
         isStale: false,
       }))
     }
