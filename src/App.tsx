@@ -1,10 +1,10 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useBeaconGraffiti } from './hooks/useBeaconGraffiti'
 import { StatsCards } from './components/StatsCards'
 import { LeaderboardTable } from './components/LeaderboardTable'
 import { PulseChainLogo } from './components/PulseChainLogo'
 import ErrorBoundary from './components/ErrorBoundary'
-import { RefreshCw, AlertCircle, Database, Cpu, X, AlertTriangle, Search } from 'lucide-react'
+import { RefreshCw, AlertCircle, Database, Cpu, X, AlertTriangle, Search, Share2, Check } from 'lucide-react'
 
 const SLOT_COUNT = 500
 
@@ -21,6 +21,7 @@ function formatRelativeTime(timestamp: number | null): string {
 function App() {
   const { result, load, checkForUpdates, clearCache } = useBeaconGraffiti()
   const [searchTerm, setSearchTerm] = useState('')
+  const [copiedLink, setCopiedLink] = useState(false)
 
   // Only check for new slots when the browser tab is visible.
   // This avoids wasting requests while the user is on another tab.
@@ -51,15 +52,44 @@ function App() {
     }
   }, []) // Empty dependency array = run only once on mount
 
-  const handleLoad = (forceFull = false) => {
+  const handleLoad = useCallback((forceFull = false) => {
     setSearchTerm('') // clear filter on new load
     load(SLOT_COUNT, forceFull)
-  }
+  }, [load])
 
   const handleClearCache = () => {
     setSearchTerm('')
     clearCache()
   }
+
+  const handleShare = async () => {
+    const url = window.location.href
+    try {
+      await navigator.clipboard.writeText(url)
+      setCopiedLink(true)
+      setTimeout(() => setCopiedLink(false), 1600)
+    } catch {
+      // Fallback for older browsers
+      window.prompt('Copy this link:', url)
+    }
+  }
+
+  // Keyboard shortcut: press "R" to refresh (when not typing in an input)
+  useEffect(() => {
+    const onKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'r' || e.key === 'R') {
+        const tag = (e.target as HTMLElement)?.tagName
+        if (tag === 'INPUT' || tag === 'TEXTAREA' || (e.target as HTMLElement)?.isContentEditable) {
+          return
+        }
+        if (result.loading) return
+        e.preventDefault()
+        handleLoad(false)
+      }
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [result.loading, handleLoad])
 
   const loadingMessage = result.loading
     ? result.progress < 100 && result.progress > 0
@@ -145,6 +175,7 @@ function App() {
               onClick={() => handleLoad(false)}
               disabled={result.loading}
               aria-busy={result.loading}
+              title="Refresh (keyboard: R)"
               className="flex items-center gap-2 text-white font-medium px-5 py-2.5 rounded text-sm transition-all disabled:bg-zinc-800 disabled:text-zinc-400 disabled:bg-none disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF00AA] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a]"
               style={{
                 background: result.loading ? undefined : 'linear-gradient(to right, #00D4FF, #FF00AA)'
@@ -171,6 +202,25 @@ function App() {
                 Full refresh
               </button>
             )}
+
+            <button
+              onClick={handleShare}
+              className="flex items-center gap-2 border border-zinc-700 hover:bg-zinc-900 px-3 py-2.5 rounded text-sm text-zinc-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF00AA] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a]"
+              title="Copy page link"
+              aria-label="Share leaderboard — copy link"
+            >
+              {copiedLink ? (
+                <>
+                  <Check className="w-4 h-4 text-emerald-400" aria-hidden="true" />
+                  <span className="text-emerald-400">Copied</span>
+                </>
+              ) : (
+                <>
+                  <Share2 className="w-4 h-4" aria-hidden="true" />
+                  Share
+                </>
+              )}
+            </button>
 
             {result.cachedAt && (
               <button
@@ -301,6 +351,8 @@ function App() {
               </a>
               <span className="hidden sm:inline" aria-hidden="true">•</span>
               <span>Built for the PulseChain community</span>
+              <span className="hidden sm:inline" aria-hidden="true">•</span>
+              <span className="text-zinc-600">Press <kbd className="px-1 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px]">R</kbd> to refresh</span>
             </div>
           </footer>
         </ErrorBoundary>
