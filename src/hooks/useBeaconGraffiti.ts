@@ -11,7 +11,7 @@ import { computeLeaderboard } from '../lib/aggregateGraffiti'
 import type { WorkerRequest, WorkerResponse } from '../lib/aggregateGraffiti'
 import { BEACON_API_ENDPOINTS, CONCURRENCY, QUICK_CACHE_KEY, MAX_CACHE_AGE_MS } from '../lib/constants'
 import { fetchWithRetry } from '../utils/retry'
-import type { FetchResult, GraffitiEntry, QuickCacheSnapshot } from '../lib/beacon/types'
+import type { FetchResult, QuickCacheSnapshot } from '../lib/beacon/types'
 
 // Re-export types so existing imports from the hook keep working
 export type { GraffitiEntry, FetchResult } from '../lib/beacon/types'
