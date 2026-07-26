@@ -1,9 +1,17 @@
-// Public PulseChain beacon API endpoint (via g4mm4 proxy)
-export const BEACON_API = 'https://rpc-pulsechain.g4mm4.io/beacon-api'
+// Primary + fallback public PulseChain beacon API endpoints.
+// The first one that responds successfully is used for the session.
+export const BEACON_API_ENDPOINTS = [
+  'https://rpc-pulsechain.g4mm4.io/beacon-api',
+  // Add additional public endpoints here if they become available.
+  // Example format: 'https://another-rpc.example/beacon-api',
+] as const
 
-// Maximum number of concurrent block requests we will make to the beacon API.
-// 18 was chosen as a good balance between speed and not getting rate-limited.
-export const CONCURRENCY = 18
+/** @deprecated Prefer BEACON_API_ENDPOINTS — kept for any legacy references */
+export const BEACON_API = BEACON_API_ENDPOINTS[0]
+
+// Maximum concurrent block requests.
+// Lowered from 18 → 10 to reduce chance of rate-limiting on public RPCs.
+export const CONCURRENCY = 10
 
 // localStorage keys
 // Full window cache (used for fast incremental updates)
