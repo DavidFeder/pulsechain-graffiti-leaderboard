@@ -75,6 +75,7 @@ function App() {
   // Stale cache banner takes precedence in styling
   const showCacheBanner = result.isFromCache && result.cachedAt
   const isStale = result.isStale
+  const hasResults = result.entries.length > 0 || result.totalSlotsFetched > 0
 
   return (
     <div className="min-h-screen bg-[#0a0a0a] text-[#ededed]">
@@ -100,7 +101,7 @@ function App() {
           </div>
 
           {/* Cache status banner - enhanced with staleness warning (takes precedence when stale) */}
-          {showCacheBanner && (
+          {showCacheBanner && !result.loading && (
             <div className={`mb-6 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-sm ${isStale 
               ? 'border-amber-900/60 bg-amber-950/60 text-amber-300' 
               : 'border-zinc-800 bg-zinc-950'}`}>
@@ -180,13 +181,14 @@ function App() {
               </div>
               <div className="text-xs text-zinc-500 mt-1.5 flex items-center gap-2">
                 <Cpu className="w-3 h-3" />
-                {loadingMessage} — running in background worker
+                {loadingMessage} — previous results stay visible until the new data is ready
               </div>
             </div>
           )}
 
-          {(result.entries.length > 0 || result.totalSlotsFetched > 0) && !result.loading && (
-            <>
+          {/* Results — stay visible (dimmed) while a refresh is running */}
+          {hasResults && (
+            <div className={result.loading ? 'opacity-50 pointer-events-none transition-opacity duration-300' : 'transition-opacity duration-300'}>
               <StatsCards result={result} />
 
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -198,6 +200,7 @@ function App() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Filter graffiti (e.g. pulse, pls, love...)"
                     className="w-full sm:w-72 bg-black border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-[#FF00AA] placeholder:text-zinc-600"
+                    disabled={result.loading}
                   />
                   {trimmedSearch && (
                     <button
@@ -217,7 +220,7 @@ function App() {
               )}
 
               <LeaderboardTable entries={displayedEntries} searchTerm={trimmedSearch || undefined} />
-            </>
+            </div>
           )}
 
           {!result.loading && result.entries.length === 0 && result.totalSlotsRequested === 0 && (
