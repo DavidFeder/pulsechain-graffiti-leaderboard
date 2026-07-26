@@ -45,12 +45,14 @@ function App() {
     }
   }, [result.lastHeadSlot, checkForUpdates])
 
-  // Automatically load the leaderboard on first page load
+  // Automatically load the leaderboard on first page load only.
+  // Intentionally empty deps — we do not want this to re-run when result changes.
   useEffect(() => {
     if (result.entries.length === 0 && !result.loading) {
       load(SLOT_COUNT, false)
     }
-  }, []) // Empty dependency array = run only once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [])
 
   const handleLoad = useCallback((forceFull = false) => {
     setSearchTerm('') // clear filter on new load

@@ -41,5 +41,7 @@ export function loadCachedWindow(): CachedWindow | null {
 export function clearCachedWindow(): void {
   try {
     localStorage.removeItem(STORAGE_KEY)
-  } catch {}
+  } catch {
+    // Ignore — private mode / quota / unavailable storage
+  }
 }

@@ -27,6 +27,6 @@ export function clearQuickResult(): void {
   try {
     localStorage.removeItem(QUICK_CACHE_KEY)
   } catch {
-    // ignore
+    // Ignore — private mode / quota / unavailable storage
   }
 }
