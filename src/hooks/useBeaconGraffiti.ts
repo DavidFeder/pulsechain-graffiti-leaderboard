@@ -5,13 +5,13 @@ import {
   clearCachedWindow,
   type CachedWindow,
 } from '../lib/storage'
-import { computeLeaderboard } from '../lib/aggregateGraffiti'
-import type { WorkerRequest, WorkerResponse } from '../lib/aggregateGraffiti'
+import type { WorkerResponse } from '../lib/aggregateGraffiti'
 import { CONCURRENCY, MAX_CACHE_AGE_MS } from '../lib/constants'
 import type { FetchResult, GraffitiRecord } from '../lib/beacon/types'
 import { saveQuickResult, loadQuickResult, clearQuickResult } from '../lib/cache/quickCache'
 import { resolveWorkingEndpoint, friendlyErrorMessage } from '../lib/beacon/endpoints'
 import { fetchHeadSlot, fetchBlockRecords } from '../lib/beacon/fetchBlocks'
+import { aggregateOnMainThread, postAggregationToWorker } from '../lib/aggregate/runAggregation'
 
 // Re-export types so existing imports from the hook keep working
 export type { GraffitiEntry, FetchResult } from '../lib/beacon/types'
@@ -176,7 +176,7 @@ export function useBeaconGraffiti() {
 
     if (!worker) {
       // Graceful degradation: do the work on the main thread.
-      const agg = computeLeaderboard(records)
+      const agg = aggregateOnMainThread(records)
       setResult(prev => ({
         ...prev,
         ...agg,
@@ -198,8 +198,7 @@ export function useBeaconGraffiti() {
       lastHeadSlot: meta.lastHeadSlot,
     }))
 
-    const request: WorkerRequest = { type: 'AGGREGATE', records }
-    worker.postMessage(request)
+    postAggregationToWorker(worker, records)
   }, [])
 
   // ---------------------------------------------------------------------------
