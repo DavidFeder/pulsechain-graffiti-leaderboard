@@ -142,6 +142,14 @@ function App() {
               </div>
             </div>
 
+            <div className="mb-3">
+              <span
+                className="inline-flex items-center rounded-full border border-[#FF00AA]/70 bg-[#FF00AA]/15 px-3 py-1 text-xs font-semibold tracking-wide text-[#FF00AA]"
+                title="Visual experiment — not production"
+              >
+                DEMO A — podium
+              </span>
+            </div>
             <p className="text-lg text-zinc-400 max-w-2xl">
               Real beacon chain graffiti from the last <span className="font-mono">{SLOT_COUNT}</span> slots.
             </p>
