@@ -91,16 +91,36 @@ body {
   }
 }
 
-/* Soft radial wash: cyan → magenta → deep black from upper center. */
-.page-bg {
+/* DEMO BG-FIXED 4 — classic vignette with a touch of official cyan/magenta.
+   Zoom-stable: paint on a viewport-locked ::before layer.
+   Do NOT use background-attachment:fixed (jumps/stretches on zoom). */
+.demo-bg {
   background-color: #0a0a0a;
-  background-image: radial-gradient(
-    ellipse 115% 78% at 50% -8%,
-    rgba(0, 212, 255, 0.20) 0%,
-    rgba(168, 85, 247, 0.10) 30%,
-    rgba(255, 0, 170, 0.08) 50%,
-    transparent 72%
-  );
+  isolation: isolate;
+}
+
+.demo-bg::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: -1;
+  pointer-events: none;
+  background-color: #0a0a0a;
   background-repeat: no-repeat;
-  background-attachment: fixed;
+  background-position: 0 0;
+  background-size: 100% 100%;
+  background-image:
+    radial-gradient(
+      ellipse 62% 52% at 50% 40%,
+      rgba(0, 234, 255, 0.045) 0%,
+      rgba(128, 0, 255, 0.035) 38%,
+      rgba(230, 25, 230, 0.04) 58%,
+      transparent 74%
+    ),
+    radial-gradient(
+      ellipse 100% 100% at 50% 50%,
+      transparent 38%,
+      rgba(0, 0, 0, 0.28) 72%,
+      rgba(0, 0, 0, 0.62) 100%
+    );
 }
