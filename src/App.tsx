@@ -129,7 +129,7 @@ function App() {
           </div>
 
           {/* Header */}
-          <header className="mb-10">
+          <header className="header-atmosphere mb-10">
             <div className="flex items-center gap-4 mb-2">
               <PulseChainLogo size={48} className="drop-shadow-[0_0_8px_rgba(255,0,170,0.4)]" />
               <div>
@@ -183,14 +183,10 @@ function App() {
                 background: result.loading ? undefined : 'linear-gradient(to right, #00D4FF, #FF00AA)'
               }}
             >
-              {result.loading ? (
-                <>{loadingMessage}</>
-              ) : (
-                <>
-                  <RefreshCw className="w-4 h-4" aria-hidden="true" /> 
-                  {result.isFromCache ? 'Update with latest blocks' : 'Load Leaderboard'}
-                </>
-              )}
+              <>
+                <RefreshCw className={`w-4 h-4${result.loading ? ' animate-spin' : ''}`} aria-hidden="true" />
+                {result.isFromCache ? 'Update with latest blocks' : 'Load Leaderboard'}
+              </>
             </button>
 
             {(result.isFromCache || isStale) && (
@@ -271,9 +267,9 @@ function App() {
             </div>
           )}
 
-          {/* Results — stay visible (dimmed) while a refresh is running */}
+          {/* Results stay fully visible and interactive while a refresh is running */}
           {hasResults && (
-            <div className={result.loading ? 'opacity-50 pointer-events-none transition-opacity duration-300' : 'transition-opacity duration-300'}>
+            <div>
               <StatsCards result={result} />
 
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
@@ -291,7 +287,6 @@ function App() {
                     onChange={(e) => setSearchTerm(e.target.value)}
                     placeholder="Filter graffiti (e.g. pulse, pls, love...)"
                     className="w-full sm:w-72 bg-black border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-[#FF00AA] focus-visible:ring-1 focus-visible:ring-[#FF00AA] placeholder:text-zinc-600"
-                    disabled={result.loading}
                     autoComplete="off"
                   />
                   {trimmedSearch && (
@@ -328,6 +323,29 @@ function App() {
               ) : (
                 <LeaderboardTable entries={displayedEntries} searchTerm={trimmedSearch || undefined} />
               )}
+            </div>
+          )}
+
+          {/* Cold start: skeleton placeholders until the first payload arrives */}
+          {result.loading && !hasResults && (
+            <div className="mb-8" aria-busy="true" aria-label="Loading leaderboard">
+              <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="stat-card">
+                    <div className="skeleton-pulse mb-3 h-3 w-24 rounded bg-zinc-800" />
+                    <div className="skeleton-pulse h-8 w-16 rounded bg-zinc-800" />
+                  </div>
+                ))}
+              </div>
+              <div className="space-y-3">
+                {[0, 1, 2, 3, 4, 5].map((i) => (
+                  <div key={i} className="flex items-center gap-3 border-b border-zinc-900 pb-3">
+                    <div className="skeleton-pulse h-7 w-7 shrink-0 rounded-full bg-zinc-800" />
+                    <div className="skeleton-pulse h-6 flex-1 rounded bg-zinc-800" />
+                    <div className="skeleton-pulse h-4 w-12 rounded bg-zinc-800" />
+                  </div>
+                ))}
+              </div>
             </div>
           )}
 
