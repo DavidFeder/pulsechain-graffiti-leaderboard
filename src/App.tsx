@@ -163,7 +163,7 @@ function App() {
                 ? 'border-amber-900/60 bg-amber-950/60 text-amber-300' 
                 : 'border-zinc-800 bg-zinc-950'}`}
             >
-              <div className={`flex items-center gap-2 ${isStale ? 'text-amber-400' : 'text-[#FF00AA]'`}>
+              <div className={`flex items-center gap-2 ${isStale ? 'text-amber-400' : 'text-[#FF00AA]'}`}>
                 {isStale ? <AlertTriangle className="h-4 w-4" aria-hidden="true" /> : <Database className="h-4 w-4" aria-hidden="true" />}
                 <span className="font-medium">{isStale ? 'Cache is stale' : 'Loaded from cache'}</span>
               </div>
