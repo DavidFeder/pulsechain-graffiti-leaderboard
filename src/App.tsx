@@ -120,7 +120,7 @@ function App() {
         : ''
 
   return (
-    <div className="min-h-screen page-bg text-[#ededed]">
+    <div className="min-h-screen demo-bg text-[#ededed]">
       <div className="max-w-5xl mx-auto px-6 py-10">
         <ErrorBoundary>
           {/* Screen-reader live region for status updates */}
@@ -142,6 +142,14 @@ function App() {
               </div>
             </div>
 
+            <div className="mb-3">
+              <span
+                className="inline-flex items-center rounded-full border border-[#FF00AA]/70 bg-[#FF00AA]/15 px-3 py-1 text-xs font-semibold tracking-wide text-[#FF00AA]"
+                title="Visual experiment — not production"
+              >
+                DEMO BG-FIXED 3 — subtle linear
+              </span>
+            </div>
             <p className="text-lg text-zinc-400 max-w-2xl">
               Real beacon chain graffiti from the last <span className="font-mono">{SLOT_COUNT}</span> slots.
             </p>
