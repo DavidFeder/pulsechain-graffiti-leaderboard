@@ -90,3 +90,46 @@ body {
     animation: none !important;
   }
 }
+
+/* DEMO BG 5 — aurora drift (not production). Slow CSS wash; static when reduced-motion. */
+.demo-bg {
+  position: relative;
+  background-color: #0a0a0a;
+}
+
+.demo-bg::before {
+  content: "";
+  position: fixed;
+  inset: -22%;
+  pointer-events: none;
+  z-index: 0;
+  background:
+    radial-gradient(ellipse 48% 38% at 22% 18%, rgba(0, 212, 255, 0.16), transparent 62%),
+    radial-gradient(ellipse 42% 34% at 78% 28%, rgba(168, 85, 247, 0.12), transparent 60%),
+    radial-gradient(ellipse 50% 40% at 48% 82%, rgba(255, 0, 170, 0.10), transparent 64%);
+  filter: blur(48px);
+  animation: aurora-drift 36s ease-in-out infinite alternate;
+}
+
+.demo-bg > * {
+  position: relative;
+  z-index: 1;
+}
+
+@keyframes aurora-drift {
+  0% {
+    transform: translate3d(-3%, -2%, 0) scale(1);
+  }
+  50% {
+    transform: translate3d(3%, 3%, 0) scale(1.07);
+  }
+  100% {
+    transform: translate3d(1%, -3%, 0) scale(1.03);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .demo-bg::before {
+    animation: none;
+  }
+}
