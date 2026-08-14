@@ -120,7 +120,7 @@ function App() {
         : ''
 
   return (
-    <div className="min-h-screen bg-[#0a0a0a] text-[#ededed]">
+    <div className="min-h-screen page-bg text-[#ededed]">
       <div className="max-w-5xl mx-auto px-6 py-10">
         <ErrorBoundary>
           {/* Screen-reader live region for status updates */}
