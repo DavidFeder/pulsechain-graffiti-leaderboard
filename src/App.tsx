@@ -5,43 +5,32 @@ import { LeaderboardTable } from './components/LeaderboardTable'
 import { PulseChainLogo } from './components/PulseChainLogo'
 import ErrorBoundary from './components/ErrorBoundary'
 import { RefreshCw, AlertCircle, Database, Cpu, X, AlertTriangle, Search, Share2, Check } from 'lucide-react'
-
-const SLOT_COUNT = 500
-
-function formatRelativeTime(timestamp: number | null): string {
-  if (!timestamp) return ''
-  const diff = Date.now() - timestamp
-  const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  return `${hours}h ago`
-}
+import { WINDOW_SIZE, HEAD_POLL_INTERVAL_MS } from './lib/constants'
+import { formatRelativeTime } from './utils/formatRelativeTime'
+import { copyText } from './utils/clipboard'
 
 function App() {
   const { result, load, checkForUpdates, clearCache } = useBeaconGraffiti()
   const [searchTerm, setSearchTerm] = useState('')
   const [copiedLink, setCopiedLink] = useState(false)
 
-  // Only check for new slots when the browser tab is visible.
-  // This avoids wasting requests while the user is on another tab.
+  // Check for new slots when the tab is visible, and poll while it stays open.
   useEffect(() => {
     if (!result.lastHeadSlot) return
 
-    const handleVisibilityChange = () => {
+    const tick = () => {
       if (document.visibilityState === 'visible') {
         checkForUpdates()
       }
     }
 
-    if (document.visibilityState === 'visible') {
-      checkForUpdates()
-    }
-
-    document.addEventListener('visibilitychange', handleVisibilityChange)
+    tick()
+    const intervalId = window.setInterval(tick, HEAD_POLL_INTERVAL_MS)
+    document.addEventListener('visibilitychange', tick)
 
     return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange)
+      window.clearInterval(intervalId)
+      document.removeEventListener('visibilitychange', tick)
     }
   }, [result.lastHeadSlot, checkForUpdates])
 
@@ -49,14 +38,14 @@ function App() {
   // Intentionally empty deps — we do not want this to re-run when result changes.
   useEffect(() => {
     if (result.entries.length === 0 && !result.loading) {
-      load(SLOT_COUNT, false)
+      load(WINDOW_SIZE, false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
   const handleLoad = useCallback((forceFull = false) => {
     setSearchTerm('') // clear filter on new load
-    load(SLOT_COUNT, forceFull)
+    load(WINDOW_SIZE, forceFull)
   }, [load])
 
   const handleClearCache = () => {
@@ -65,14 +54,10 @@ function App() {
   }
 
   const handleShare = async () => {
-    const url = window.location.href
-    try {
-      await navigator.clipboard.writeText(url)
+    const ok = await copyText(window.location.href)
+    if (ok) {
       setCopiedLink(true)
-      setTimeout(() => setCopiedLink(false), 1600)
-    } catch {
-      // Fallback for older browsers
-      window.prompt('Copy this link:', url)
+      window.setTimeout(() => setCopiedLink(false), 1600)
     }
   }
 
@@ -94,10 +79,12 @@ function App() {
   }, [result.loading, handleLoad])
 
   const loadingMessage = result.loading
-    ? result.progress < 100 && result.progress > 0
-      ? `Fetching new blocks... ${result.progress}%`
-      : 'Aggregating graffiti data in background...'
-    : ''
+    ? result.statusMessage
+      ? result.statusMessage
+      : result.progress < 100 && result.progress > 0
+        ? `Fetching new blocks... ${result.progress}%`
+        : 'Aggregating graffiti data in background...'
+    : result.statusMessage || ''
 
   const trimmedSearch = searchTerm.trim()
   const displayedEntries = trimmedSearch
@@ -143,7 +130,7 @@ function App() {
             </div>
 
             <p className="text-lg text-zinc-400 max-w-2xl">
-              Real beacon chain graffiti from the last <span className="font-mono">{SLOT_COUNT}</span> slots.
+              Real beacon chain graffiti from the last <span className="font-mono">{WINDOW_SIZE}</span> slots.
             </p>
           </header>
 
@@ -185,7 +172,7 @@ function App() {
             >
               <>
                 <RefreshCw className={`w-4 h-4${result.loading ? ' animate-spin' : ''}`} aria-hidden="true" />
-                {result.isFromCache ? 'Update with latest blocks' : 'Load Leaderboard'}
+                {result.isFromCache || hasResults ? 'Update with latest blocks' : 'Load Leaderboard'}
               </>
             </button>
 

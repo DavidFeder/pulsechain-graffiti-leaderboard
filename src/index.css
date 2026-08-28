@@ -14,6 +14,7 @@ body {
 .graffiti-cell {
   font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
   word-break: break-all;
+  unicode-bidi: isolate;
 }
 
 .leaderboard-table th {

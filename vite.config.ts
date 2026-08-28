@@ -1,11 +1,31 @@
-import { defineConfig } from 'vite'
+import { defineConfig } from 'vitest/config'
 import react from '@vitejs/plugin-react-swc'
 
-// https://vitejs.dev/config/
+const beaconProxy = {
+  '/api/beacon-fallback': {
+    target: 'https://pulsechain-beacon-api.publicnode.com',
+    changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/api\/beacon-fallback/, ''),
+  },
+  '/api/beacon': {
+    target: 'https://rpc-pulsechain.g4mm4.io',
+    changeOrigin: true,
+    rewrite: (path: string) => path.replace(/^\/api\/beacon/, '/beacon-api'),
+  },
+}
+
 export default defineConfig({
   plugins: [react()],
-  base: '/', // Required for custom domain at root
+  base: '/',
   server: {
-    port: 5173
-  }
+    port: 5173,
+    proxy: beaconProxy,
+  },
+  preview: {
+    proxy: beaconProxy,
+  },
+  test: {
+    environment: 'node',
+    include: ['src/**/*.test.ts'],
+  },
 })

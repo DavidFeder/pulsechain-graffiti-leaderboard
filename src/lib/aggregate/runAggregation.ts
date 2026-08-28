@@ -14,8 +14,9 @@ export function aggregateOnMainThread(records: GraffitiRecord[]): AggregatedResu
  */
 export function postAggregationToWorker(
   worker: Worker,
-  records: GraffitiRecord[]
+  records: GraffitiRecord[],
+  requestId: number
 ): void {
-  const request: WorkerRequest = { type: 'AGGREGATE', records }
+  const request: WorkerRequest = { type: 'AGGREGATE', requestId, records }
   worker.postMessage(request)
 }
