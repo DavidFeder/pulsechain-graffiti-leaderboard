@@ -1,30 +1,38 @@
 import { decodeGraffiti } from '../decodeGraffiti'
 import { fetchWithConcurrencyLimit } from '../../utils/concurrency'
-import { fetchWithRetry } from '../../utils/retry'
+import { fetchWithRetry, type RetryInfo } from '../../utils/retry'
 import type { GraffitiRecord } from './types'
+
+export type BeaconRetryHandler = (info: RetryInfo) => void
 
 /**
  * Fetch the current beacon head slot from the given API base URL.
  */
 export async function fetchHeadSlot(
   base: string,
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  onRetry?: BeaconRetryHandler
 ): Promise<number> {
   const headRes = await fetchWithRetry(
     `${base}/eth/v1/beacon/headers/head`,
-    { signal },
+    { signal, onRetry },
     2
   )
   if (!headRes.ok) throw new Error('Failed to fetch head slot from beacon API')
 
   const headData = await headRes.json()
-  return Number(headData.data.header.message.slot)
+  const slot = Number(headData?.data?.header?.message?.slot)
+  if (!Number.isFinite(slot) || slot < 0) {
+    throw new Error('Beacon API returned an invalid head slot')
+  }
+  return slot
 }
 
 export interface FetchBlocksOptions {
   concurrency: number
   signal?: AbortSignal
   onProgress?: (completed: number, total: number) => void
+  onRetry?: BeaconRetryHandler
 }
 
 /**
@@ -36,7 +44,7 @@ export async function fetchBlockRecords(
   slots: number[],
   options: FetchBlocksOptions
 ): Promise<GraffitiRecord[]> {
-  const { concurrency, signal, onProgress } = options
+  const { concurrency, signal, onProgress, onRetry } = options
   const total = slots.length
   let completed = 0
 
@@ -46,7 +54,7 @@ export async function fetchBlockRecords(
       try {
         const res = await fetchWithRetry(
           `${base}/eth/v2/beacon/blocks/${slot}`,
-          { signal: fetchSignal },
+          { signal: fetchSignal, onRetry },
           1
         )
         if (!res.ok) {

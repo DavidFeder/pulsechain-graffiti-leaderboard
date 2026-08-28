@@ -1,6 +1,10 @@
 {
   "rewrites": [
     {
+      "source": "/api/beacon-fallback/:path*",
+      "destination": "https://pulsechain-beacon-api.publicnode.com/:path*"
+    },
+    {
       "source": "/api/beacon/:path*",
       "destination": "https://rpc-pulsechain.g4mm4.io/beacon-api/:path*"
     }

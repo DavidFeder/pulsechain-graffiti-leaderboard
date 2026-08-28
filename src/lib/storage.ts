@@ -1,4 +1,5 @@
 import { STORAGE_KEY } from './constants'
+import type { GraffitiRecord } from './beacon/types'
 
 /**
  * Shape of the full sliding-window cache stored in localStorage.
@@ -9,8 +10,30 @@ export interface CachedWindow {
   version: 1
   windowSize: number
   lastHeadSlot: number
-  records: Array<{ slot: number; graffiti: string }>
+  records: GraffitiRecord[]
   cachedAt: number
+}
+
+export function isCachedWindow(value: unknown): value is CachedWindow {
+  if (!value || typeof value !== 'object') return false
+  const parsed = value as CachedWindow
+  if (
+    parsed.version !== 1 ||
+    typeof parsed.windowSize !== 'number' ||
+    typeof parsed.lastHeadSlot !== 'number' ||
+    typeof parsed.cachedAt !== 'number' ||
+    !Array.isArray(parsed.records)
+  ) {
+    return false
+  }
+
+  return parsed.records.every(isGraffitiRecord)
+}
+
+function isGraffitiRecord(value: unknown): value is GraffitiRecord {
+  if (!value || typeof value !== 'object') return false
+  const record = value as GraffitiRecord
+  return typeof record.slot === 'number' && Number.isFinite(record.slot) && typeof record.graffiti === 'string'
 }
 
 export function saveCachedWindow(data: CachedWindow): void {
@@ -26,13 +49,8 @@ export function loadCachedWindow(): CachedWindow | null {
     const raw = localStorage.getItem(STORAGE_KEY)
     if (!raw) return null
 
-    const parsed = JSON.parse(raw) as CachedWindow
-
-    if (!parsed || parsed.version !== 1 || !Array.isArray(parsed.records)) {
-      return null
-    }
-
-    return parsed
+    const parsed: unknown = JSON.parse(raw)
+    return isCachedWindow(parsed) ? parsed : null
   } catch {
     return null
   }

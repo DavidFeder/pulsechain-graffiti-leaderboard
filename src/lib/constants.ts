@@ -1,16 +1,23 @@
-// Beacon API is now proxied through Vercel at /api/beacon
-// (see vercel.json rewrite → https://rpc-pulsechain.g4mm4.io/beacon-api)
-// This avoids CORS issues that public beacon endpoints often have.
+// Beacon API is proxied through Vercel at /api/beacon* (see vercel.json)
+// and through Vite's dev server proxy locally (see vite.config.ts).
+// Same-origin paths keep CSP connect-src on 'self' and avoid CORS.
 export const BEACON_API_ENDPOINTS = [
   '/api/beacon',
+  '/api/beacon-fallback',
 ] as const
 
 /** @deprecated Prefer BEACON_API_ENDPOINTS — kept for any legacy references */
 export const BEACON_API = BEACON_API_ENDPOINTS[0]
 
+export const WINDOW_SIZE = 500
+
 // Maximum concurrent block requests.
-// Raised back to 10 now that traffic goes through the same-origin proxy.
 export const CONCURRENCY = 10
+
+export const HEAD_POLL_INTERVAL_MS = 45_000
+
+/** Otterscan slot pages (PulseChain). */
+export const BEACON_SLOT_EXPLORER = 'https://otter.pulsechain.com/slot/'
 
 // localStorage keys
 // Full window cache (used for fast incremental updates)

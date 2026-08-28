@@ -1,6 +1,8 @@
 import { useState } from 'react'
 import { GraffitiEntry } from '../hooks/useBeaconGraffiti'
-import { Copy, Check } from 'lucide-react'
+import { Copy, Check, ExternalLink } from 'lucide-react'
+import { copyText } from '../utils/clipboard'
+import { slotExplorerUrl } from '../lib/beacon/explorers'
 
 interface Props {
   entries: GraffitiEntry[]
@@ -42,6 +44,22 @@ function Medal({ place, size = 'md' }: { place: 1 | 2 | 3; size?: 'sm' | 'md' | 
   )
 }
 
+function SlotLink({ slot }: { slot: number }) {
+  if (!Number.isFinite(slot) || slot <= 0) return null
+  return (
+    <a
+      href={slotExplorerUrl(slot)}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="inline-flex items-center gap-0.5 text-[10px] text-zinc-500 hover:text-[#00D4FF] focus:outline-none focus-visible:underline"
+      title={`Open slot ${slot.toLocaleString()} in explorer`}
+    >
+      slot {slot.toLocaleString()}
+      <ExternalLink className="h-2.5 w-2.5" aria-hidden="true" />
+    </a>
+  )
+}
+
 function PodiumCard({
   entry,
   place,
@@ -80,6 +98,9 @@ function PodiumCard({
       </div>
       <div className={`mt-2 font-semibold tabular-nums ${isGold ? 'text-lg' : 'text-sm'}`}>{entry.count}</div>
       <div className="text-[11px] text-zinc-500">{entry.percentage.toFixed(1)}%</div>
+      <div className="mt-1">
+        <SlotLink slot={entry.exampleSlot} />
+      </div>
     </div>
   )
 }
@@ -88,13 +109,10 @@ export function LeaderboardTable({ entries, searchTerm }: Props) {
   const [copiedGraffiti, setCopiedGraffiti] = useState<string | null>(null)
 
   const copyToClipboard = async (text: string) => {
-    try {
-      await navigator.clipboard.writeText(text)
-      setCopiedGraffiti(text)
-      setTimeout(() => setCopiedGraffiti(null), 1400)
-    } catch {
-      // Clipboard API not available (very old browsers)
-    }
+    const ok = await copyText(text)
+    if (!ok) return
+    setCopiedGraffiti(text)
+    window.setTimeout(() => setCopiedGraffiti(null), 1400)
   }
 
   if (entries.length === 0) {
@@ -107,8 +125,6 @@ export function LeaderboardTable({ entries, searchTerm }: Props) {
     )
   }
 
-  // Podium + medals apply only to the unfiltered leaderboard so a search
-  // does not accidentally crown the first three matching rows.
   const celebrateTop = !searchTerm
   const top3 = celebrateTop ? entries.slice(0, 3) : []
 
@@ -175,7 +191,7 @@ export function LeaderboardTable({ entries, searchTerm }: Props) {
             {entries.map((entry, index) => {
               const isCopied = copiedGraffiti === entry.graffiti
               return (
-                <tr key={index} className={rowWash(index)}>
+                <tr key={entry.graffiti} className={rowWash(index)}>
                   <td className="w-12 pr-2">
                     <div className="flex items-center justify-center">
                       {getMetalBadge(index) || (
@@ -202,6 +218,7 @@ export function LeaderboardTable({ entries, searchTerm }: Props) {
                           <Copy className="h-3.5 w-3.5" />
                         )}
                       </button>
+                      <SlotLink slot={entry.exampleSlot} />
                     </div>
                   </td>
                   <td className="text-right font-medium tabular-nums">{entry.count}</td>

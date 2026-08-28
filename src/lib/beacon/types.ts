@@ -6,6 +6,8 @@ export interface GraffitiEntry {
   graffiti: string
   count: number
   percentage: number
+  /** Most recent slot in the window that carried this graffiti. */
+  exampleSlot: number
 }
 
 export interface FetchResult {
@@ -17,6 +19,8 @@ export interface FetchResult {
   loading: boolean
   progress: number
   error: string | null
+  /** Transient retry / rate-limit copy shown while a load is in flight. */
+  statusMessage: string | null
   isFromCache: boolean
   cachedAt: number | null
   lastHeadSlot: number | null
@@ -31,6 +35,8 @@ export interface FetchResult {
 export interface QuickCacheSnapshot {
   entries: GraffitiEntry[]
   totalSlotsRequested: number
+  totalSlotsFetched: number
+  slotsWithGraffiti: number
   cachedAt: number
   lastHeadSlot: number
 }

@@ -32,6 +32,8 @@ npm run dev
 
 Open [http://localhost:5173](http://localhost:5173)
 
+The Vite dev server proxies `/api/beacon` and `/api/beacon-fallback` so local development hits the same beacon APIs as production (no `vercel dev` required).
+
 #### Scripts
 
 | Command              | Description                    |
@@ -40,6 +42,7 @@ Open [http://localhost:5173](http://localhost:5173)
 | `npm run build`      | Type-check + production build  |
 | `npm run preview`    | Preview production build       |
 | `npm run lint`       | Run ESLint                     |
+| `npm test`           | Run unit tests                 |
 | `npm run format`     | Format with Prettier           |
 
 ---
@@ -51,8 +54,7 @@ Open [http://localhost:5173](http://localhost:5173)
   - Full 500-slot window of raw records → correct incremental updates
 
 - **Same-origin proxy**  
-  Browser calls `/api/beacon/*` → Vercel rewrites to the public beacon API.  
-  This eliminates CORS problems that most public beacon endpoints have.
+  Browser calls `/api/beacon/*` (g4mm4) with automatic failover to `/api/beacon-fallback/*` (PublicNode). Vercel rewrites and the Vite dev proxy both map these to the public beacon APIs. That avoids CORS and keeps CSP `connect-src` on `'self'`.
 
 - **Web Worker**  
   Counting and sorting run off the main thread.
@@ -69,7 +71,8 @@ Open [http://localhost:5173](http://localhost:5173)
 
 - Vite + React 18 + TypeScript + Tailwind CSS
 - `@vitejs/plugin-react-swc` for fast builds
-- Vercel (hosting + analytics + edge proxy)
+- Vercel (hosting + analytics + edge proxy, with PublicNode beacon failover)
+- Vitest for decode / aggregation / cache / retry unit tests
 - Pure client-side — no custom backend
 
 ---

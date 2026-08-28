@@ -1,24 +1,27 @@
 import { BEACON_API_ENDPOINTS } from '../constants'
-import { fetchWithRetry } from '../../utils/retry'
+import { fetchWithRetry, type RetryInfo } from '../../utils/retry'
 
 /**
  * Returns the first endpoint that successfully answers a head request.
  * Used for simple failover across the configured beacon API list.
  */
-export async function resolveWorkingEndpoint(signal?: AbortSignal): Promise<string> {
+export async function resolveWorkingEndpoint(
+  signal?: AbortSignal,
+  onRetry?: (info: RetryInfo) => void
+): Promise<string> {
   let lastError: unknown = null
 
   for (const endpoint of BEACON_API_ENDPOINTS) {
     try {
       const res = await fetchWithRetry(
         `${endpoint}/eth/v1/beacon/headers/head`,
-        { signal },
+        { signal, onRetry },
         1
       )
       if (res.ok) return endpoint
+      lastError = new Error(`Beacon endpoint ${endpoint} returned HTTP ${res.status}`)
     } catch (err) {
       lastError = err
-      // try next
     }
   }
 
@@ -33,7 +36,7 @@ export function friendlyErrorMessage(err: unknown): string {
 
   const msg = err.message.toLowerCase()
 
-  if (err.name === 'AbortError') return '' // handled by caller
+  if (err.name === 'AbortError') return ''
   if (
     msg.includes('networkerror') ||
     msg.includes('failed to fetch') ||
@@ -44,7 +47,7 @@ export function friendlyErrorMessage(err: unknown): string {
   if (msg.includes('all beacon api endpoints failed')) {
     return 'All known beacon API endpoints are currently unreachable. Please try again later.'
   }
-  if (msg.includes('failed to fetch head')) {
+  if (msg.includes('failed to fetch head') || msg.includes('invalid head slot')) {
     return 'Could not reach the beacon API. It may be rate-limited — please wait a few seconds and try again.'
   }
 

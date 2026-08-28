@@ -1,23 +1,14 @@
 import { FetchResult } from '../hooks/useBeaconGraffiti'
+import { formatRelativeTime } from '../utils/formatRelativeTime'
+import { slotExplorerUrl } from '../lib/beacon/explorers'
+import { ExternalLink } from 'lucide-react'
 
 interface Props {
   result: FetchResult
 }
 
-function formatRelativeTime(timestamp: number | null): string {
-  if (!timestamp) return ''
-  const diff = Date.now() - timestamp
-  const minutes = Math.floor(diff / 60000)
-  if (minutes < 1) return 'just now'
-  if (minutes < 60) return `${minutes}m ago`
-  const hours = Math.floor(minutes / 60)
-  if (hours < 24) return `${hours}h ago`
-  const days = Math.floor(hours / 24)
-  return `${days}d ago`
-}
-
 export function StatsCards({ result }: Props) {
-  const { totalSlotsRequested, totalSlotsFetched, slotsWithGraffiti, uniqueGraffiti, cachedAt } = result
+  const { totalSlotsRequested, totalSlotsFetched, slotsWithGraffiti, uniqueGraffiti, cachedAt, lastHeadSlot } = result
 
   return (
     <div className="mb-8">
@@ -43,11 +34,20 @@ export function StatsCards({ result }: Props) {
         </div>
       </div>
 
-      {cachedAt && (
-        <div className="mt-2 text-[11px] text-zinc-500 text-right">
-          Last updated {formatRelativeTime(cachedAt)}
-        </div>
-      )}
+      <div className="mt-2 flex flex-wrap items-center justify-end gap-x-3 gap-y-1 text-[11px] text-zinc-500">
+        {typeof lastHeadSlot === 'number' && lastHeadSlot > 0 && (
+          <a
+            href={slotExplorerUrl(lastHeadSlot)}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="inline-flex items-center gap-1 hover:text-[#00D4FF] focus:outline-none focus-visible:underline"
+          >
+            Head slot {lastHeadSlot.toLocaleString()}
+            <ExternalLink className="h-3 w-3" aria-hidden="true" />
+          </a>
+        )}
+        {cachedAt && <span>Last updated {formatRelativeTime(cachedAt)}</span>}
+      </div>
     </div>
   )
 }
