@@ -172,7 +172,7 @@ function App() {
             >
               <>
                 <RefreshCw className={`w-4 h-4${result.loading ? ' animate-spin' : ''}`} aria-hidden="true" />
-                {result.isFromCache ? 'Update with latest blocks' : 'Load Leaderboard'}
+                {result.isFromCache || hasResults ? 'Update with latest blocks' : 'Load Leaderboard'}
               </>
             </button>
 
