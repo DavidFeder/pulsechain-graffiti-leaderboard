@@ -18,7 +18,9 @@ describe('cache parsers', () => {
   })
 
   it('rejects malformed quick snapshots', () => {
-    expect(isQuickCacheSnapshot({ cachedAt: 1, lastHeadSlot: 2, totalSlotsRequested: 500 })).toBe(false)
+    expect(isQuickCacheSnapshot({ cachedAt: 1, lastHeadSlot: 2, totalSlotsRequested: 500 })).toBe(
+      false
+    )
     expect(
       isQuickCacheSnapshot({
         cachedAt: 1,

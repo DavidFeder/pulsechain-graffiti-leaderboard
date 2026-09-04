@@ -2,6 +2,14 @@ import { BEACON_API_ENDPOINTS } from '../constants'
 import { fetchWithRetry, type RetryInfo } from '../../utils/retry'
 
 /**
+ * Working endpoint first, then the remaining configured failover list.
+ */
+export function orderedEndpoints(primary: string): string[] {
+  const rest = BEACON_API_ENDPOINTS.filter(endpoint => endpoint !== primary)
+  return [primary, ...rest]
+}
+
+/**
  * Returns the first endpoint that successfully answers a head request.
  * Used for simple failover across the configured beacon API list.
  */
@@ -25,9 +33,7 @@ export async function resolveWorkingEndpoint(
     }
   }
 
-  throw lastError instanceof Error
-    ? lastError
-    : new Error('All beacon API endpoints failed')
+  throw lastError instanceof Error ? lastError : new Error('All beacon API endpoints failed')
 }
 
 /** Turn low-level fetch errors into clearer user-facing messages. */

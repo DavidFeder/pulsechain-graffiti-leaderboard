@@ -1,18 +1,31 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect, useCallback, useRef } from 'react'
 import { useBeaconGraffiti } from './hooks/useBeaconGraffiti'
 import { StatsCards } from './components/StatsCards'
 import { LeaderboardTable } from './components/LeaderboardTable'
 import { PulseChainLogo } from './components/PulseChainLogo'
 import ErrorBoundary from './components/ErrorBoundary'
-import { RefreshCw, AlertCircle, Database, Cpu, X, AlertTriangle, Search, Share2, Check } from 'lucide-react'
+import {
+  RefreshCw,
+  AlertCircle,
+  Database,
+  Cpu,
+  X,
+  AlertTriangle,
+  Search,
+  Share2,
+  Check,
+} from 'lucide-react'
 import { WINDOW_SIZE, HEAD_POLL_INTERVAL_MS } from './lib/constants'
 import { formatRelativeTime } from './utils/formatRelativeTime'
 import { copyText } from './utils/clipboard'
+import { incompleteFetchMessage } from './lib/beacon/fetchOutcome'
 
 function App() {
   const { result, load, checkForUpdates, clearCache } = useBeaconGraffiti()
   const [searchTerm, setSearchTerm] = useState('')
   const [copiedLink, setCopiedLink] = useState(false)
+  const [errorBoundaryKey, setErrorBoundaryKey] = useState(0)
+  const shareTimerRef = useRef<number | null>(null)
 
   // Check for new slots when the tab is visible, and poll while it stays open.
   useEffect(() => {
@@ -43,21 +56,31 @@ function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
 
-  const handleLoad = useCallback((forceFull = false) => {
-    setSearchTerm('') // clear filter on new load
-    load(WINDOW_SIZE, forceFull)
-  }, [load])
+  const handleLoad = useCallback(
+    (forceFull = false) => {
+      setSearchTerm('') // clear filter on new load
+      load(WINDOW_SIZE, forceFull)
+    },
+    [load]
+  )
 
   const handleClearCache = () => {
     setSearchTerm('')
     clearCache()
   }
 
+  useEffect(() => {
+    return () => {
+      if (shareTimerRef.current) window.clearTimeout(shareTimerRef.current)
+    }
+  }, [])
+
   const handleShare = async () => {
     const ok = await copyText(window.location.href)
     if (ok) {
       setCopiedLink(true)
-      window.setTimeout(() => setCopiedLink(false), 1600)
+      if (shareTimerRef.current) window.clearTimeout(shareTimerRef.current)
+      shareTimerRef.current = window.setTimeout(() => setCopiedLink(false), 1600)
     }
   }
 
@@ -102,14 +125,18 @@ function App() {
     ? loadingMessage
     : result.error
       ? `Error: ${result.error}`
-      : hasResults
-        ? `Loaded ${result.entries.length} unique graffiti from ${result.totalSlotsFetched} slots`
-        : ''
+      : result.incompleteFetch
+        ? incompleteFetchMessage(result.failedSlotCount, !result.isFromCache)
+        : hasResults
+          ? `Loaded ${result.entries.length} unique graffiti from ${result.totalSlotsFetched} slots`
+          : ''
+
+  const showFullRefresh = result.isFromCache || isStale || result.incompleteFetch
 
   return (
     <div className="min-h-screen page-bg text-[#ededed]">
       <div className="max-w-5xl mx-auto px-6 py-10">
-        <ErrorBoundary>
+        <ErrorBoundary key={errorBoundaryKey} onReset={() => setErrorBoundaryKey(k => k + 1)}>
           {/* Screen-reader live region for status updates */}
           <div className="sr-only" aria-live="polite" aria-atomic="true">
             {liveStatus}
@@ -130,7 +157,8 @@ function App() {
             </div>
 
             <p className="text-lg text-zinc-400 max-w-2xl">
-              Real beacon chain graffiti from the last <span className="font-mono">{WINDOW_SIZE}</span> slots.
+              Real beacon chain graffiti from the last{' '}
+              <span className="font-mono">{WINDOW_SIZE}</span> slots.
             </p>
           </header>
 
@@ -138,17 +166,32 @@ function App() {
           {showCacheBanner && !result.loading && (
             <div
               role="status"
-              className={`mb-6 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-sm ${isStale 
-                ? 'border-amber-900/60 bg-amber-950/60 text-amber-300' 
-                : 'border-zinc-800 bg-zinc-950'}`}
+              className={`mb-6 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-sm ${
+                isStale
+                  ? 'border-amber-900/60 bg-amber-950/60 text-amber-300'
+                  : 'border-zinc-800 bg-zinc-950'
+              }`}
             >
-              <div className={`flex items-center gap-2 ${isStale ? 'text-amber-400' : 'text-[#FF00AA]'}`}>
-                {isStale ? <AlertTriangle className="h-4 w-4" aria-hidden="true" /> : <Database className="h-4 w-4" aria-hidden="true" />}
-                <span className="font-medium">{isStale ? 'Cache is stale' : 'Loaded from cache'}</span>
+              <div
+                className={`flex items-center gap-2 ${isStale ? 'text-amber-400' : 'text-[#FF00AA]'}`}
+              >
+                {isStale ? (
+                  <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                ) : (
+                  <Database className="h-4 w-4" aria-hidden="true" />
+                )}
+                <span className="font-medium">
+                  {isStale ? 'Cache is stale' : 'Loaded from cache'}
+                </span>
               </div>
               <div className={isStale ? 'text-amber-300/80' : 'text-zinc-400'}>
-                Last synced {formatRelativeTime(result.cachedAt)} • up to slot {result.lastHeadSlot?.toLocaleString()}
-                {isStale && <span className="ml-1.5 font-medium">(older than 6 hours — full refresh recommended)</span>}
+                Last synced {formatRelativeTime(result.cachedAt)} • up to slot{' '}
+                {result.lastHeadSlot?.toLocaleString()}
+                {isStale && (
+                  <span className="ml-1.5 font-medium">
+                    (older than 6 hours — full refresh recommended)
+                  </span>
+                )}
               </div>
               {result.newSlotsAvailable > 0 && !isStale && (
                 <div className="ml-auto rounded bg-[#FF00AA]/10 px-3 py-1 text-xs font-medium text-[#FF00AA]">
@@ -158,8 +201,27 @@ function App() {
             </div>
           )}
 
+          {result.incompleteFetch && !result.loading && (
+            <div
+              role="status"
+              className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-amber-900/60 bg-amber-950/60 px-4 py-3 text-sm text-amber-300"
+            >
+              <div className="flex items-center gap-2 text-amber-400">
+                <AlertTriangle className="h-4 w-4" aria-hidden="true" />
+                <span className="font-medium">Incomplete fetch</span>
+              </div>
+              <div className="text-amber-300/90">
+                {incompleteFetchMessage(result.failedSlotCount, !result.isFromCache)}
+              </div>
+            </div>
+          )}
+
           {/* Controls */}
-          <div className="flex flex-wrap items-center gap-3 mb-6" role="group" aria-label="Leaderboard controls">
+          <div
+            className="flex flex-wrap items-center gap-3 mb-6"
+            role="group"
+            aria-label="Leaderboard controls"
+          >
             <button
               onClick={() => handleLoad(false)}
               disabled={result.loading}
@@ -167,22 +229,31 @@ function App() {
               title="Refresh (keyboard: R)"
               className="flex items-center gap-2 text-white font-medium px-5 py-2.5 rounded text-sm transition-all disabled:bg-zinc-800 disabled:text-zinc-400 disabled:bg-none disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF00AA] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a]"
               style={{
-                background: result.loading ? undefined : 'linear-gradient(to right, #00D4FF, #FF00AA)'
+                background: result.loading
+                  ? undefined
+                  : 'linear-gradient(to right, #00D4FF, #FF00AA)',
               }}
             >
               <>
-                <RefreshCw className={`w-4 h-4${result.loading ? ' animate-spin' : ''}`} aria-hidden="true" />
-                {result.isFromCache || hasResults ? 'Update with latest blocks' : 'Load Leaderboard'}
+                <RefreshCw
+                  className={`w-4 h-4${result.loading ? ' animate-spin' : ''}`}
+                  aria-hidden="true"
+                />
+                {result.isFromCache || hasResults
+                  ? 'Update with latest blocks'
+                  : 'Load Leaderboard'}
               </>
             </button>
 
-            {(result.isFromCache || isStale) && (
+            {showFullRefresh && (
               <button
                 onClick={() => handleLoad(true)}
                 disabled={result.loading}
-                className={`flex items-center gap-2 border px-4 py-2.5 rounded text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF00AA] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a] ${isStale 
-                  ? 'border-amber-700 hover:bg-amber-950 text-amber-300' 
-                  : 'border-zinc-700 hover:bg-zinc-900'}`}
+                className={`flex items-center gap-2 border px-4 py-2.5 rounded text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF00AA] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a] ${
+                  isStale || result.incompleteFetch
+                    ? 'border-amber-700 hover:bg-amber-950 text-amber-300'
+                    : 'border-zinc-700 hover:bg-zinc-900'
+                }`}
               >
                 Full refresh
               </button>
@@ -240,11 +311,18 @@ function App() {
 
           {/* Progress bar */}
           {result.loading && (
-            <div className="mb-6" role="progressbar" aria-valuenow={result.progress} aria-valuemin={0} aria-valuemax={100} aria-label={loadingMessage}>
+            <div
+              className="mb-6"
+              role="progressbar"
+              aria-valuenow={result.progress}
+              aria-valuemin={0}
+              aria-valuemax={100}
+              aria-label={loadingMessage}
+            >
               <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <div 
-                  className="h-1.5 bg-gradient-to-r from-[#00D4FF] to-[#FF00AA] transition-all duration-200" 
-                  style={{ width: `${result.progress}%` }} 
+                <div
+                  className="h-1.5 bg-gradient-to-r from-[#00D4FF] to-[#FF00AA] transition-all duration-200"
+                  style={{ width: `${result.progress}%` }}
                 />
               </div>
               <div className="text-xs text-zinc-500 mt-1.5 flex items-center gap-2">
@@ -271,7 +349,7 @@ function App() {
                     id="graffiti-filter"
                     type="search"
                     value={searchTerm}
-                    onChange={(e) => setSearchTerm(e.target.value)}
+                    onChange={e => setSearchTerm(e.target.value)}
                     placeholder="Filter graffiti (e.g. pulse, pls, love...)"
                     className="w-full sm:w-72 bg-black border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-[#FF00AA] focus-visible:ring-1 focus-visible:ring-[#FF00AA] placeholder:text-zinc-600"
                     autoComplete="off"
@@ -291,14 +369,20 @@ function App() {
 
               {trimmedSearch && !noFilterMatches && (
                 <div className="text-[10px] text-zinc-500 -mt-1 mb-2" aria-live="polite">
-                  Showing {displayedEntries.length} of {result.entries.length} matching “{trimmedSearch}”
+                  Showing {displayedEntries.length} of {result.entries.length} matching “
+                  {trimmedSearch}”
                 </div>
               )}
 
               {noFilterMatches ? (
-                <div className="text-center py-12 text-zinc-500 border border-dashed border-zinc-800 rounded-xl" role="status">
+                <div
+                  className="text-center py-12 text-zinc-500 border border-dashed border-zinc-800 rounded-xl"
+                  role="status"
+                >
                   <Search className="w-8 h-8 mx-auto mb-3 opacity-40" aria-hidden="true" />
-                  <div className="font-medium text-zinc-400">No graffiti matched “{trimmedSearch}”</div>
+                  <div className="font-medium text-zinc-400">
+                    No graffiti matched “{trimmedSearch}”
+                  </div>
                   <div className="text-xs mt-1.5">Try a different filter or clear the search.</div>
                   <button
                     onClick={() => setSearchTerm('')}
@@ -308,7 +392,10 @@ function App() {
                   </button>
                 </div>
               ) : (
-                <LeaderboardTable entries={displayedEntries} searchTerm={trimmedSearch || undefined} />
+                <LeaderboardTable
+                  entries={displayedEntries}
+                  searchTerm={trimmedSearch || undefined}
+                />
               )}
             </div>
           )}
@@ -317,7 +404,7 @@ function App() {
           {result.loading && !hasResults && (
             <div className="mb-8" aria-busy="true" aria-label="Loading leaderboard">
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
-                {[0, 1, 2, 3].map((i) => (
+                {[0, 1, 2, 3].map(i => (
                   <div key={i} className="stat-card">
                     <div className="skeleton-pulse mb-3 h-3 w-24 rounded bg-zinc-800" />
                     <div className="skeleton-pulse h-8 w-16 rounded bg-zinc-800" />
@@ -325,7 +412,7 @@ function App() {
                 ))}
               </div>
               <div className="space-y-3">
-                {[0, 1, 2, 3, 4, 5].map((i) => (
+                {[0, 1, 2, 3, 4, 5].map(i => (
                   <div key={i} className="flex items-center gap-3 border-b border-zinc-900 pb-3">
                     <div className="skeleton-pulse h-7 w-7 shrink-0 rounded-full bg-zinc-800" />
                     <div className="skeleton-pulse h-6 flex-1 rounded bg-zinc-800" />
@@ -338,10 +425,17 @@ function App() {
 
           {/* Initial empty / first-load state */}
           {!result.loading && !hasResults && !result.error && (
-            <div className="text-center py-16 text-zinc-500 border border-dashed border-zinc-800 rounded-xl" role="status">
+            <div
+              className="text-center py-16 text-zinc-500 border border-dashed border-zinc-800 rounded-xl"
+              role="status"
+            >
               <div className="font-medium text-zinc-400 mb-1">No data yet</div>
-              <div className="text-sm">Click “Load Leaderboard” to fetch the latest graffiti from the beacon chain.</div>
-              <div className="text-xs mt-3 text-zinc-600">Returning visitors get instant results from local cache.</div>
+              <div className="text-sm">
+                Click “Load Leaderboard” to fetch the latest graffiti from the beacon chain.
+              </div>
+              <div className="text-xs mt-3 text-zinc-600">
+                Returning visitors get instant results from local cache.
+              </div>
             </div>
           )}
 
@@ -356,10 +450,20 @@ function App() {
               >
                 GitHub
               </a>
-              <span className="hidden sm:inline" aria-hidden="true">•</span>
+              <span className="hidden sm:inline" aria-hidden="true">
+                •
+              </span>
               <span>Built for the PulseChain community</span>
-              <span className="hidden sm:inline" aria-hidden="true">•</span>
-              <span className="text-zinc-600">Press <kbd className="px-1 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px]">R</kbd> to refresh</span>
+              <span className="hidden sm:inline" aria-hidden="true">
+                •
+              </span>
+              <span className="text-zinc-600">
+                Press{' '}
+                <kbd className="px-1 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px]">
+                  R
+                </kbd>{' '}
+                to refresh
+              </span>
             </div>
           </footer>
         </ErrorBoundary>

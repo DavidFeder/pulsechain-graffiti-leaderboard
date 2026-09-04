@@ -54,9 +54,10 @@ export function loadQuickResult(): QuickCacheSnapshot | null {
           : parsed.totalSlotsRequested,
       slotsWithGraffiti:
         typeof parsed.slotsWithGraffiti === 'number' ? parsed.slotsWithGraffiti : 0,
-      entries: parsed.entries.map((entry) => ({
+      entries: parsed.entries.map(entry => ({
         ...entry,
-        exampleSlot: typeof entry.exampleSlot === 'number' ? entry.exampleSlot : parsed.lastHeadSlot,
+        exampleSlot:
+          typeof entry.exampleSlot === 'number' ? entry.exampleSlot : parsed.lastHeadSlot,
       })),
     }
   } catch {

@@ -1,12 +1,20 @@
 {
   "rewrites": [
     {
-      "source": "/api/beacon-fallback/:path*",
-      "destination": "https://pulsechain-beacon-api.publicnode.com/:path*"
+      "source": "/api/beacon-fallback/eth/v1/beacon/headers/head",
+      "destination": "https://pulsechain-beacon-api.publicnode.com/eth/v1/beacon/headers/head"
     },
     {
-      "source": "/api/beacon/:path*",
-      "destination": "https://rpc-pulsechain.g4mm4.io/beacon-api/:path*"
+      "source": "/api/beacon-fallback/eth/v2/beacon/blocks/:slot(\\d+)",
+      "destination": "https://pulsechain-beacon-api.publicnode.com/eth/v2/beacon/blocks/:slot"
+    },
+    {
+      "source": "/api/beacon/eth/v1/beacon/headers/head",
+      "destination": "https://rpc-pulsechain.g4mm4.io/beacon-api/eth/v1/beacon/headers/head"
+    },
+    {
+      "source": "/api/beacon/eth/v2/beacon/blocks/:slot(\\d+)",
+      "destination": "https://rpc-pulsechain.g4mm4.io/beacon-api/eth/v2/beacon/blocks/:slot"
     }
   ],
   "headers": [

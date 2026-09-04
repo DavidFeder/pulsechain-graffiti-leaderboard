@@ -21,7 +21,9 @@ describe('fetchWithRetry', () => {
     const controller = new AbortController()
     controller.abort()
 
-    await expect(fetchWithRetry('https://example.test', { signal: controller.signal }, 3, 10)).rejects.toMatchObject({
+    await expect(
+      fetchWithRetry('https://example.test', { signal: controller.signal }, 3, 10)
+    ).rejects.toMatchObject({
       name: 'AbortError',
     })
     expect(fetchMock).not.toHaveBeenCalled()

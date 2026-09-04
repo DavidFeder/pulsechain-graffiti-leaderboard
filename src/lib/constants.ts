@@ -1,13 +1,7 @@
 // Beacon API is proxied through Vercel at /api/beacon* (see vercel.json)
 // and through Vite's dev server proxy locally (see vite.config.ts).
 // Same-origin paths keep CSP connect-src on 'self' and avoid CORS.
-export const BEACON_API_ENDPOINTS = [
-  '/api/beacon',
-  '/api/beacon-fallback',
-] as const
-
-/** @deprecated Prefer BEACON_API_ENDPOINTS — kept for any legacy references */
-export const BEACON_API = BEACON_API_ENDPOINTS[0]
+export const BEACON_API_ENDPOINTS = ['/api/beacon', '/api/beacon-fallback'] as const
 
 export const WINDOW_SIZE = 500
 

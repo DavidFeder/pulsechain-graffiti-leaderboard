@@ -1,13 +1,14 @@
-import { Component, ErrorInfo, ReactNode } from 'react';
+import { Component, ErrorInfo, ReactNode } from 'react'
 
 interface Props {
-  children: ReactNode;
-  fallback?: ReactNode;
+  children: ReactNode
+  fallback?: ReactNode
+  onReset?: () => void
 }
 
 interface State {
-  hasError: boolean;
-  error?: Error;
+  hasError: boolean
+  error?: Error
 }
 
 /**
@@ -16,33 +17,32 @@ interface State {
  */
 class ErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
-    super(props);
-    this.state = { hasError: false };
+    super(props)
+    this.state = { hasError: false }
   }
 
   static getDerivedStateFromError(error: Error): State {
-    return { hasError: true, error };
+    return { hasError: true, error }
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error, errorInfo);
+    console.error('ErrorBoundary caught an error:', error, errorInfo)
   }
 
   handleReset = () => {
-    this.setState({ hasError: false, error: undefined });
-  };
+    this.setState({ hasError: false, error: undefined })
+    this.props.onReset?.()
+  }
 
   render() {
     if (this.state.hasError) {
       if (this.props.fallback) {
-        return this.props.fallback;
+        return this.props.fallback
       }
 
       return (
         <div className="max-w-2xl mx-auto mt-10 p-6 bg-red-950 border border-red-800 rounded-xl text-center">
-          <h2 className="text-xl font-semibold text-red-400 mb-2">
-            Something went wrong
-          </h2>
+          <h2 className="text-xl font-semibold text-red-400 mb-2">Something went wrong</h2>
           <p className="text-red-300 mb-4 text-sm">
             An unexpected error occurred while rendering the leaderboard.
           </p>
@@ -58,11 +58,11 @@ class ErrorBoundary extends Component<Props, State> {
             Try again
           </button>
         </div>
-      );
+      )
     }
 
-    return this.props.children;
+    return this.props.children
   }
 }
 
-export default ErrorBoundary;
+export default ErrorBoundary

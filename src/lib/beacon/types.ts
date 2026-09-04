@@ -30,6 +30,13 @@ export interface FetchResult {
    * UI should show a warning and encourage a Full refresh.
    */
   isStale: boolean
+  /**
+   * True when the last network fetch could not retrieve every requested slot
+   * (API errors, not missed proposals). Full refresh should stay available.
+   */
+  incompleteFetch: boolean
+  /** Count of slots that failed for reasons other than a 404 missed block. */
+  failedSlotCount: number
 }
 
 export interface QuickCacheSnapshot {

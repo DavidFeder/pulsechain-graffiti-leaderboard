@@ -33,7 +33,11 @@ export function isCachedWindow(value: unknown): value is CachedWindow {
 function isGraffitiRecord(value: unknown): value is GraffitiRecord {
   if (!value || typeof value !== 'object') return false
   const record = value as GraffitiRecord
-  return typeof record.slot === 'number' && Number.isFinite(record.slot) && typeof record.graffiti === 'string'
+  return (
+    typeof record.slot === 'number' &&
+    Number.isFinite(record.slot) &&
+    typeof record.graffiti === 'string'
+  )
 }
 
 export function saveCachedWindow(data: CachedWindow): void {

@@ -9,8 +9,12 @@ import type { WorkerResponse } from '../lib/aggregateGraffiti'
 import { CONCURRENCY, MAX_CACHE_AGE_MS } from '../lib/constants'
 import type { FetchResult, GraffitiRecord } from '../lib/beacon/types'
 import { saveQuickResult, loadQuickResult, clearQuickResult } from '../lib/cache/quickCache'
-import { resolveWorkingEndpoint, friendlyErrorMessage } from '../lib/beacon/endpoints'
-import { fetchHeadSlot, fetchBlockRecords } from '../lib/beacon/fetchBlocks'
+import {
+  resolveWorkingEndpoint,
+  friendlyErrorMessage,
+  orderedEndpoints,
+} from '../lib/beacon/endpoints'
+import { fetchHeadSlot, fetchBlockRecords, type SlotFetchSummary } from '../lib/beacon/fetchBlocks'
 import { aggregateOnMainThread, postAggregationToWorker } from '../lib/aggregate/runAggregation'
 import {
   mergeWindowRecords,
@@ -18,8 +22,13 @@ import {
   shouldFetchFullWindow,
   slotsInWindow,
 } from '../lib/beacon/mergeWindow'
+import {
+  decideLoadCommit,
+  incompleteFetchMessage,
+  isPersistableFetch,
+} from '../lib/beacon/fetchOutcome'
 import type { RetryInfo } from '../utils/retry'
-import { isAbortError } from '../utils/retry'
+import { isAbortError, throwIfAborted } from '../utils/retry'
 
 export type { GraffitiEntry, FetchResult } from '../lib/beacon/types'
 
@@ -44,6 +53,8 @@ function emptyResult(): FetchResult {
     lastHeadSlot: null,
     newSlotsAvailable: 0,
     isStale: false,
+    incompleteFetch: false,
+    failedSlotCount: 0,
   }
 }
 
@@ -55,6 +66,9 @@ interface AggregationMeta {
   isStale: boolean
   isFromCache: boolean
   showLoading: boolean
+  persistQuick: boolean
+  incompleteFetch: boolean
+  failedSlotCount: number
 }
 
 /**
@@ -79,6 +93,8 @@ export function useBeaconGraffiti() {
         lastHeadSlot: quick.lastHeadSlot,
         newSlotsAvailable: 0,
         isStale: isCacheStale(quick.cachedAt),
+        incompleteFetch: false,
+        failedSlotCount: 0,
       }
     }
     return emptyResult()
@@ -89,50 +105,69 @@ export function useBeaconGraffiti() {
   const workingEndpointRef = useRef<string | null>(null)
   const aggregationIdRef = useRef(0)
   const aggregationMetaRef = useRef<AggregationMeta | null>(null)
+  const loadGenerationRef = useRef(0)
+  const loadInFlightRef = useRef(false)
 
-  const persistQuickSnapshot = useCallback((
-    agg: { entries: FetchResult['entries']; totalSlotsFetched: number; slotsWithGraffiti: number; uniqueGraffiti: number },
-    meta: AggregationMeta
-  ) => {
-    saveQuickResult({
-      entries: agg.entries,
-      totalSlotsRequested: meta.totalSlotsRequested,
-      totalSlotsFetched: agg.totalSlotsFetched,
-      slotsWithGraffiti: agg.slotsWithGraffiti,
-      cachedAt: meta.cachedAt,
-      lastHeadSlot: meta.lastHeadSlot,
-    })
-  }, [])
+  const persistQuickSnapshot = useCallback(
+    (
+      agg: {
+        entries: FetchResult['entries']
+        totalSlotsFetched: number
+        slotsWithGraffiti: number
+        uniqueGraffiti: number
+      },
+      meta: AggregationMeta
+    ) => {
+      saveQuickResult({
+        entries: agg.entries,
+        totalSlotsRequested: meta.totalSlotsRequested,
+        totalSlotsFetched: agg.totalSlotsFetched,
+        slotsWithGraffiti: agg.slotsWithGraffiti,
+        cachedAt: meta.cachedAt,
+        lastHeadSlot: meta.lastHeadSlot,
+      })
+    },
+    []
+  )
 
-  const applyAggregation = useCallback((
-    agg: { entries: FetchResult['entries']; totalSlotsFetched: number; slotsWithGraffiti: number; uniqueGraffiti: number },
-    meta: AggregationMeta
-  ) => {
-    persistQuickSnapshot(agg, meta)
-    setResult(prev => ({
-      ...prev,
-      entries: agg.entries,
-      totalSlotsFetched: agg.totalSlotsFetched,
-      slotsWithGraffiti: agg.slotsWithGraffiti,
-      uniqueGraffiti: agg.uniqueGraffiti,
-      totalSlotsRequested: meta.totalSlotsRequested,
-      loading: false,
-      progress: 100,
-      error: null,
-      statusMessage: null,
-      isFromCache: meta.isFromCache,
-      cachedAt: meta.cachedAt,
-      lastHeadSlot: meta.lastHeadSlot,
-      isStale: meta.isStale,
-      newSlotsAvailable: meta.isFromCache ? prev.newSlotsAvailable : 0,
-    }))
-  }, [persistQuickSnapshot])
+  const applyAggregation = useCallback(
+    (
+      agg: {
+        entries: FetchResult['entries']
+        totalSlotsFetched: number
+        slotsWithGraffiti: number
+        uniqueGraffiti: number
+      },
+      meta: AggregationMeta
+    ) => {
+      if (meta.persistQuick) persistQuickSnapshot(agg, meta)
+      setResult(prev => ({
+        ...prev,
+        entries: agg.entries,
+        totalSlotsFetched: agg.totalSlotsFetched,
+        slotsWithGraffiti: agg.slotsWithGraffiti,
+        uniqueGraffiti: agg.uniqueGraffiti,
+        totalSlotsRequested: meta.totalSlotsRequested,
+        loading: false,
+        progress: 100,
+        error: null,
+        statusMessage: null,
+        isFromCache: meta.isFromCache,
+        cachedAt: meta.cachedAt,
+        lastHeadSlot: meta.lastHeadSlot,
+        isStale: meta.isStale,
+        newSlotsAvailable: meta.isFromCache ? prev.newSlotsAvailable : 0,
+        incompleteFetch: meta.incompleteFetch,
+        failedSlotCount: meta.failedSlotCount,
+      }))
+    },
+    [persistQuickSnapshot]
+  )
 
   useEffect(() => {
-    const worker = new Worker(
-      new URL('../workers/graffitiAggregator.worker.ts', import.meta.url),
-      { type: 'module' }
-    )
+    const worker = new Worker(new URL('../workers/graffitiAggregator.worker.ts', import.meta.url), {
+      type: 'module',
+    })
     workerRef.current = worker
 
     worker.onmessage = (event: MessageEvent<WorkerResponse>) => {
@@ -154,7 +189,7 @@ export function useBeaconGraffiti() {
       }
     }
 
-    worker.onerror = (err) => {
+    worker.onerror = err => {
       console.error('Graffiti worker error:', err)
       setResult(prev => ({
         ...prev,
@@ -176,32 +211,37 @@ export function useBeaconGraffiti() {
     }
   }, [])
 
-  const aggregateViaWorker = useCallback((records: GraffitiRecord[], meta: Omit<AggregationMeta, 'requestId'>) => {
-    const requestId = ++aggregationIdRef.current
-    const fullMeta: AggregationMeta = { ...meta, requestId }
-    aggregationMetaRef.current = fullMeta
+  const aggregateViaWorker = useCallback(
+    (records: GraffitiRecord[], meta: Omit<AggregationMeta, 'requestId'>) => {
+      const requestId = ++aggregationIdRef.current
+      const fullMeta: AggregationMeta = { ...meta, requestId }
+      aggregationMetaRef.current = fullMeta
 
-    const worker = workerRef.current
+      const worker = workerRef.current
 
-    if (!worker) {
-      applyAggregation(aggregateOnMainThread(records), fullMeta)
-      return
-    }
+      if (!worker) {
+        applyAggregation(aggregateOnMainThread(records), fullMeta)
+        return
+      }
 
-    setResult(prev => ({
-      ...prev,
-      loading: meta.showLoading,
-      progress: meta.showLoading ? 0 : prev.progress,
-      error: meta.showLoading ? null : prev.error,
-      totalSlotsRequested: meta.totalSlotsRequested,
-      lastHeadSlot: meta.lastHeadSlot,
-      cachedAt: meta.cachedAt,
-      isFromCache: meta.isFromCache,
-      isStale: meta.isStale,
-    }))
+      setResult(prev => ({
+        ...prev,
+        loading: meta.showLoading,
+        progress: meta.showLoading ? 100 : prev.progress,
+        error: meta.showLoading && !meta.incompleteFetch ? null : prev.error,
+        totalSlotsRequested: meta.totalSlotsRequested,
+        lastHeadSlot: meta.lastHeadSlot,
+        cachedAt: meta.cachedAt,
+        isFromCache: meta.isFromCache,
+        isStale: meta.isStale,
+        incompleteFetch: meta.incompleteFetch,
+        failedSlotCount: meta.failedSlotCount,
+      }))
 
-    postAggregationToWorker(worker, records, requestId)
-  }, [applyAggregation])
+      postAggregationToWorker(worker, records, requestId)
+    },
+    [applyAggregation]
+  )
 
   useEffect(() => {
     const cached = loadCachedWindow()
@@ -213,114 +253,214 @@ export function useBeaconGraffiti() {
         isStale: isCacheStale(cached.cachedAt),
         isFromCache: true,
         showLoading: false,
+        persistQuick: true,
+        incompleteFetch: false,
+        failedSlotCount: 0,
       })
     }
   }, [aggregateViaWorker])
 
-  const load = useCallback(async (slotCount: number, forceFullRefresh = false) => {
-    abortControllerRef.current?.abort()
-    const controller = new AbortController()
-    abortControllerRef.current = controller
-    const { signal } = controller
+  const load = useCallback(
+    async (slotCount: number, forceFullRefresh = false) => {
+      const generation = ++loadGenerationRef.current
+      abortControllerRef.current?.abort()
+      const controller = new AbortController()
+      abortControllerRef.current = controller
+      loadInFlightRef.current = true
+      const { signal } = controller
 
-    const onRetry = (info: RetryInfo) => {
-      if (signal.aborted) return
-      if (info.status === 429) {
-        setResult(prev => ({
-          ...prev,
-          statusMessage: 'Beacon API rate-limited — retrying…',
-        }))
-      } else if (info.status && info.status >= 500) {
-        setResult(prev => ({
-          ...prev,
-          statusMessage: 'Beacon API error — retrying…',
-        }))
-      }
-    }
+      const stillCurrent = () => generation === loadGenerationRef.current && !signal.aborted
 
-    setResult(prev => ({
-      ...prev,
-      loading: true,
-      error: null,
-      statusMessage: null,
-      progress: 0,
-      totalSlotsRequested: slotCount,
-      isFromCache: false,
-      isStale: false,
-    }))
-
-    try {
-      let base = workingEndpointRef.current
-      if (!base) {
-        base = await resolveWorkingEndpoint(signal, onRetry)
-        workingEndpointRef.current = base
-      }
-
-      const currentHeadSlot = await fetchHeadSlot(base, signal, onRetry)
-
-      const cached = !forceFullRefresh ? loadCachedWindow() : null
-      let records: GraffitiRecord[] = []
-
-      const onProgress = (completed: number, total: number) => {
-        const p = total > 0 ? Math.round((completed / total) * 100) : 0
-        setResult(prev => ({ ...prev, progress: p }))
-      }
-
-      const fetchOpts = {
-        concurrency: CONCURRENCY,
-        signal,
-        onProgress,
-        onRetry,
-      }
-
-      if (cached && cached.records.length > 0 && cached.windowSize === slotCount) {
-        const lastKnown = cached.lastHeadSlot
-        const delta = currentHeadSlot - lastKnown
-
-        if (delta <= 0) {
-          records = mergeWindowRecords(cached.records, [], currentHeadSlot, slotCount)
-        } else if (shouldFetchFullWindow(delta, slotCount)) {
-          records = await fetchBlockRecords(base, slotsInWindow(currentHeadSlot, slotCount), fetchOpts)
-        } else {
-          const newRecords = await fetchBlockRecords(base, newSlotsSince(lastKnown, currentHeadSlot), fetchOpts)
-          records = mergeWindowRecords(cached.records, newRecords, currentHeadSlot, slotCount)
+      const onRetry = (info: RetryInfo) => {
+        if (!stillCurrent()) return
+        if (info.status === 429) {
+          setResult(prev => ({
+            ...prev,
+            statusMessage: 'Beacon API rate-limited — retrying…',
+          }))
+        } else if (info.status && info.status >= 500) {
+          setResult(prev => ({
+            ...prev,
+            statusMessage: 'Beacon API error — retrying…',
+          }))
         }
-      } else {
-        records = await fetchBlockRecords(base, slotsInWindow(currentHeadSlot, slotCount), fetchOpts)
       }
 
-      const fetchedAt = Date.now()
-      const toCache: CachedWindow = {
-        version: 1,
-        windowSize: slotCount,
-        lastHeadSlot: currentHeadSlot,
-        records,
-        cachedAt: fetchedAt,
-      }
-      saveCachedWindow(toCache)
-
-      aggregateViaWorker(records, {
-        totalSlotsRequested: slotCount,
-        lastHeadSlot: currentHeadSlot,
-        cachedAt: fetchedAt,
-        isStale: false,
-        isFromCache: false,
-        showLoading: true,
-      })
-    } catch (err: unknown) {
-      if (isAbortError(err)) return
-      workingEndpointRef.current = null
       setResult(prev => ({
         ...prev,
-        loading: false,
-        error: friendlyErrorMessage(err),
+        loading: true,
+        error: null,
         statusMessage: null,
+        progress: 0,
+        totalSlotsRequested: slotCount,
+        isFromCache: false,
         isStale: false,
+        incompleteFetch: false,
+        failedSlotCount: 0,
       }))
-    }
-  }, [aggregateViaWorker])
+
+      try {
+        let base = workingEndpointRef.current
+        if (!base) {
+          base = await resolveWorkingEndpoint(signal, onRetry)
+          if (!stillCurrent()) return
+          workingEndpointRef.current = base
+        }
+
+        const bases = orderedEndpoints(base)
+        const currentHeadSlot = await fetchHeadSlot(bases, signal, onRetry)
+        if (!stillCurrent()) return
+
+        const cached = !forceFullRefresh ? loadCachedWindow() : null
+        const hasCachedWindow = Boolean(
+          cached && cached.records.length > 0 && cached.windowSize === slotCount
+        )
+
+        const onProgress = (completed: number, total: number) => {
+          if (!stillCurrent()) return
+          const p = total > 0 ? Math.round((completed / total) * 100) : 0
+          setResult(prev => ({ ...prev, progress: p }))
+        }
+
+        const fetchOpts = {
+          concurrency: CONCURRENCY,
+          signal,
+          onProgress,
+          onRetry,
+        }
+
+        let records: GraffitiRecord[] = []
+        let requestedSlots = 0
+        let missingCount = 0
+        let failedSlots: number[] = []
+
+        const ingest = (fetched: SlotFetchSummary, requested: number) => {
+          requestedSlots = requested
+          missingCount = fetched.missingCount
+          failedSlots = fetched.failedSlots
+          if (fetched.fallbackSuccesses > 0 || fetched.failedSlots.length > 0) {
+            workingEndpointRef.current = null
+          }
+          return fetched.records
+        }
+
+        if (hasCachedWindow && cached) {
+          const lastKnown = cached.lastHeadSlot
+          const delta = currentHeadSlot - lastKnown
+
+          if (delta <= 0) {
+            records = mergeWindowRecords(cached.records, [], currentHeadSlot, slotCount)
+            requestedSlots = 0
+          } else if (shouldFetchFullWindow(delta, slotCount)) {
+            const slots = slotsInWindow(currentHeadSlot, slotCount)
+            records = ingest(await fetchBlockRecords(bases, slots, fetchOpts), slots.length)
+          } else {
+            const slots = newSlotsSince(lastKnown, currentHeadSlot)
+            const newRecords = ingest(
+              await fetchBlockRecords(bases, slots, fetchOpts),
+              slots.length
+            )
+            records = mergeWindowRecords(cached.records, newRecords, currentHeadSlot, slotCount)
+          }
+        } else {
+          const slots = slotsInWindow(currentHeadSlot, slotCount)
+          records = ingest(await fetchBlockRecords(bases, slots, fetchOpts), slots.length)
+        }
+
+        throwIfAborted(signal)
+        if (!stillCurrent()) return
+
+        const persistable =
+          requestedSlots === 0 ||
+          isPersistableFetch({
+            requested: requestedSlots,
+            missingCount,
+            failedCount: failedSlots.length,
+          })
+
+        const action = decideLoadCommit({
+          persistable,
+          hasCachedWindow,
+          recordCount: records.length,
+        })
+
+        if (action === 'keep-previous') {
+          setResult(prev => ({
+            ...prev,
+            loading: false,
+            progress: 100,
+            statusMessage: null,
+            error: null,
+            isFromCache: true,
+            incompleteFetch: true,
+            failedSlotCount: failedSlots.length,
+          }))
+          return
+        }
+
+        if (action === 'error') {
+          workingEndpointRef.current = null
+          setResult(prev => ({
+            ...prev,
+            loading: false,
+            progress: 100,
+            error: incompleteFetchMessage(failedSlots.length || requestedSlots, true),
+            statusMessage: null,
+            incompleteFetch: true,
+            failedSlotCount: failedSlots.length || requestedSlots,
+          }))
+          return
+        }
+
+        const fetchedAt = Date.now()
+        const persist = action === 'persist'
+
+        if (persist) {
+          const toCache: CachedWindow = {
+            version: 1,
+            windowSize: slotCount,
+            lastHeadSlot: currentHeadSlot,
+            records,
+            cachedAt: fetchedAt,
+          }
+          saveCachedWindow(toCache)
+        }
+
+        if (!stillCurrent()) return
+
+        aggregateViaWorker(records, {
+          totalSlotsRequested: slotCount,
+          lastHeadSlot: persist ? currentHeadSlot : (cached?.lastHeadSlot ?? currentHeadSlot),
+          cachedAt: persist ? fetchedAt : (cached?.cachedAt ?? fetchedAt),
+          isStale: persist ? false : isCacheStale(cached?.cachedAt),
+          isFromCache: !persist,
+          showLoading: true,
+          persistQuick: persist,
+          incompleteFetch: !persist,
+          failedSlotCount: persist ? 0 : failedSlots.length,
+        })
+      } catch (err: unknown) {
+        if (isAbortError(err) || generation !== loadGenerationRef.current) return
+        workingEndpointRef.current = null
+        setResult(prev => ({
+          ...prev,
+          loading: false,
+          error: friendlyErrorMessage(err),
+          statusMessage: null,
+          isStale: false,
+          incompleteFetch: false,
+        }))
+      } finally {
+        if (generation === loadGenerationRef.current) {
+          loadInFlightRef.current = false
+        }
+      }
+    },
+    [aggregateViaWorker]
+  )
 
   const checkForUpdates = useCallback(async () => {
+    if (loadInFlightRef.current) return 0
     const cached = loadCachedWindow()
     if (!cached) return 0
 
@@ -331,7 +471,7 @@ export function useBeaconGraffiti() {
         workingEndpointRef.current = base
       }
 
-      const headSlot = await fetchHeadSlot(base)
+      const headSlot = await fetchHeadSlot(orderedEndpoints(base))
       const delta = headSlot - cached.lastHeadSlot
       const newDelta = Math.max(0, delta)
 
@@ -343,6 +483,8 @@ export function useBeaconGraffiti() {
   }, [])
 
   const clearCache = useCallback(() => {
+    loadGenerationRef.current += 1
+    loadInFlightRef.current = false
     aggregationIdRef.current += 1
     aggregationMetaRef.current = null
     abortControllerRef.current?.abort()
