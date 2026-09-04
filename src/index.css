@@ -12,7 +12,9 @@ body {
 }
 
 .graffiti-cell {
-  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace;
+  font-family:
+    ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New',
+    monospace;
   word-break: break-all;
   unicode-bidi: isolate;
 }
@@ -39,7 +41,7 @@ body {
 
 /* PulseChain hot magenta accents */
 .pulse-accent {
-  color: #FF00AA;
+  color: #ff00aa;
 }
 
 /* Header atmosphere OFF: no banner, no header-box, no grid cutout. */
@@ -47,22 +49,18 @@ body {
   position: relative;
 }
 
-.header-atmosphere::before,
-.header-atmosphere::after {
-  content: none !important;
-  display: none !important;
-  background: none !important;
-  -webkit-mask-image: none !important;
-  mask-image: none !important;
-}
-
 .skeleton-pulse {
   animation: skeleton-pulse 1.6s ease-in-out infinite;
 }
 
 @keyframes skeleton-pulse {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.45; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.45;
+  }
 }
 
 @media (prefers-reduced-motion: reduce) {
@@ -83,7 +81,7 @@ body {
 }
 
 .page-bg::before {
-  content: "";
+  content: '';
   position: fixed;
   inset: 0;
   z-index: -1;

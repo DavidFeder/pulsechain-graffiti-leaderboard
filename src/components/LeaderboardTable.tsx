@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { GraffitiEntry } from '../hooks/useBeaconGraffiti'
 import { Copy, Check, ExternalLink } from 'lucide-react'
 import { copyText } from '../utils/clipboard'
@@ -10,7 +10,8 @@ interface Props {
 }
 
 function Medal({ place, size = 'md' }: { place: 1 | 2 | 3; size?: 'sm' | 'md' | 'lg' }) {
-  const dim = size === 'lg' ? 'h-10 w-10 text-sm' : size === 'md' ? 'h-8 w-8 text-xs' : 'h-7 w-7 text-[11px]'
+  const dim =
+    size === 'lg' ? 'h-10 w-10 text-sm' : size === 'md' ? 'h-8 w-8 text-xs' : 'h-7 w-7 text-[11px]'
   if (place === 1) {
     return (
       <div
@@ -93,10 +94,16 @@ function PodiumCard({
           title="Copy graffiti to clipboard"
           aria-label={`Copy “${entry.graffiti}” to clipboard`}
         >
-          {copied ? <Check className="h-3.5 w-3.5 text-emerald-400" /> : <Copy className="h-3.5 w-3.5" />}
+          {copied ? (
+            <Check className="h-3.5 w-3.5 text-emerald-400" />
+          ) : (
+            <Copy className="h-3.5 w-3.5" />
+          )}
         </button>
       </div>
-      <div className={`mt-2 font-semibold tabular-nums ${isGold ? 'text-lg' : 'text-sm'}`}>{entry.count}</div>
+      <div className={`mt-2 font-semibold tabular-nums ${isGold ? 'text-lg' : 'text-sm'}`}>
+        {entry.count}
+      </div>
       <div className="text-[11px] text-zinc-500">{entry.percentage.toFixed(1)}%</div>
       <div className="mt-1">
         <SlotLink slot={entry.exampleSlot} />
@@ -107,12 +114,20 @@ function PodiumCard({
 
 export function LeaderboardTable({ entries, searchTerm }: Props) {
   const [copiedGraffiti, setCopiedGraffiti] = useState<string | null>(null)
+  const copyTimerRef = useRef<number | null>(null)
+
+  useEffect(() => {
+    return () => {
+      if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current)
+    }
+  }, [])
 
   const copyToClipboard = async (text: string) => {
     const ok = await copyText(text)
     if (!ok) return
     setCopiedGraffiti(text)
-    window.setTimeout(() => setCopiedGraffiti(null), 1400)
+    if (copyTimerRef.current) window.clearTimeout(copyTimerRef.current)
+    copyTimerRef.current = window.setTimeout(() => setCopiedGraffiti(null), 1400)
   }
 
   if (entries.length === 0) {
@@ -147,7 +162,11 @@ export function LeaderboardTable({ entries, searchTerm }: Props) {
   return (
     <div>
       {top3.length > 0 && (
-        <div className="mb-6 flex items-end justify-center gap-2 sm:gap-3">
+        <div
+          className="mb-6 flex items-end justify-center gap-2 sm:gap-3"
+          aria-hidden="true"
+          {...{ inert: '' }}
+        >
           {top3[1] && (
             <PodiumCard
               entry={top3[1]}

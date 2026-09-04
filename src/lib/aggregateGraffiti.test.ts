@@ -13,8 +13,18 @@ describe('computeLeaderboard', () => {
     expect(result.totalSlotsFetched).toBe(4)
     expect(result.slotsWithGraffiti).toBe(3)
     expect(result.uniqueGraffiti).toBe(2)
-    expect(result.entries[0]).toMatchObject({ graffiti: 'aaa', count: 2, percentage: 50, exampleSlot: 3 })
-    expect(result.entries[1]).toMatchObject({ graffiti: 'bbb', count: 1, percentage: 25, exampleSlot: 2 })
+    expect(result.entries[0]).toMatchObject({
+      graffiti: 'aaa',
+      count: 2,
+      percentage: 50,
+      exampleSlot: 3,
+    })
+    expect(result.entries[1]).toMatchObject({
+      graffiti: 'bbb',
+      count: 1,
+      percentage: 25,
+      exampleSlot: 2,
+    })
   })
 
   it('groups case-insensitively and keeps the most common spelling', () => {

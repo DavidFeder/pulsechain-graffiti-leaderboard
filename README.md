@@ -11,9 +11,9 @@ Real beacon chain graffiti leaderboard for PulseChain. Shows the most popular gr
 - Real **beacon chain** graffiti (not execution-layer `extraData`)
 - Fixed 500-slot sliding window (fast + reliable on public endpoints)
 - Two-tier local caching for instant return visits
-- Incremental updates (only fetches new slots since last visit)
+- Incremental fetching only persists a new window when every requested slot is a block or a 404 missed proposal — aborted or rate-limited fetches never overwrite a good cache
 - Web Worker aggregation so the UI stays responsive
-- Same-origin proxy for the beacon API (avoids CORS issues)
+- Same-origin proxy for the beacon API (head + per-slot blocks only, to avoid an open proxy)
 - Copy-to-clipboard on every graffiti entry
 - Search / filter
 - Vercel Analytics + Speed Insights
@@ -36,14 +36,14 @@ The Vite dev server proxies `/api/beacon` and `/api/beacon-fallback` so local de
 
 #### Scripts
 
-| Command              | Description                    |
-|----------------------|--------------------------------|
-| `npm run dev`        | Start development server       |
-| `npm run build`      | Type-check + production build  |
-| `npm run preview`    | Preview production build       |
-| `npm run lint`       | Run ESLint                     |
-| `npm test`           | Run unit tests                 |
-| `npm run format`     | Format with Prettier           |
+| Command           | Description                   |
+| ----------------- | ----------------------------- |
+| `npm run dev`     | Start development server      |
+| `npm run build`   | Type-check + production build |
+| `npm run preview` | Preview production build      |
+| `npm run lint`    | Run ESLint                    |
+| `npm test`        | Run unit tests                |
+| `npm run format`  | Format with Prettier          |
 
 ---
 
@@ -54,16 +54,16 @@ The Vite dev server proxies `/api/beacon` and `/api/beacon-fallback` so local de
   - Full 500-slot window of raw records → correct incremental updates
 
 - **Same-origin proxy**  
-  Browser calls `/api/beacon/*` (g4mm4) with automatic failover to `/api/beacon-fallback/*` (PublicNode). Vercel rewrites and the Vite dev proxy both map these to the public beacon APIs. That avoids CORS and keeps CSP `connect-src` on `'self'`.
+  Browser calls `/api/beacon/*` (g4mm4) with automatic failover to `/api/beacon-fallback/*` (PublicNode). Rewrites are limited to `eth/v1/beacon/headers/head` and `eth/v2/beacon/blocks/:slot`. Vite uses a trailing slash on `/api/beacon/` so it cannot prefix-match the fallback path. That avoids CORS, keeps CSP `connect-src` on `'self'`, and is not an open proxy.
 
 - **Web Worker**  
   Counting and sorting run off the main thread.
 
 - **Incremental fetching**  
-  After the first load we only request new slots since the last cached head.
+  After the first load we only request new slots since the last cached head. Incomplete fetches (API errors, not missed proposals) keep the previous window and offer a Full refresh.
 
 - **AbortController**  
-  In-flight requests are cancelled when the user triggers a new load.
+  In-flight requests are cancelled when the user triggers a new load. Aborted work does not persist a partial cache.
 
 ---
 
@@ -77,4 +77,4 @@ The Vite dev server proxies `/api/beacon` and `/api/beacon-fallback` so local de
 
 ---
 
-Built for the PulseChain community by [ValidatorStore](https://validatorstore.com).
+Built for the PulseChain community by [ValidatorStore](https://validatorstore.com). MIT licensed.

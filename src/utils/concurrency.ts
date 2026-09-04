@@ -1,8 +1,11 @@
+import { isAbortError, throwIfAborted } from './retry'
+
 /**
  * Runs an array of async tasks with limited concurrency.
  * Returns results in the same order as input (with possible nulls for failures).
  *
- * Supports optional AbortSignal for cancellation.
+ * AbortError is rethrown. If the signal trips while workers are draining,
+ * the call still rejects after in-flight tasks settle.
  */
 export async function fetchWithConcurrencyLimit<T, R>(
   items: T[],
@@ -12,11 +15,12 @@ export async function fetchWithConcurrencyLimit<T, R>(
 ): Promise<(R | null)[]> {
   const results: (R | null)[] = new Array(items.length).fill(null)
   let index = 0
+  let abortError: unknown = null
 
   async function worker() {
     while (index < items.length) {
-      // Check for abort before starting next item
       if (signal?.aborted) {
+        abortError ??= signal.reason instanceof Error ? signal.reason : undefined
         return
       }
 
@@ -24,9 +28,8 @@ export async function fetchWithConcurrencyLimit<T, R>(
       try {
         results[currentIndex] = await fn(items[currentIndex], currentIndex, signal)
       } catch (err) {
-        if (err instanceof Error && err.name === 'AbortError') {
-          // Don't treat abort as a failure
-          results[currentIndex] = null
+        if (isAbortError(err)) {
+          abortError = err
           return
         }
         console.warn('Task failed for item', items[currentIndex], err)
@@ -37,5 +40,8 @@ export async function fetchWithConcurrencyLimit<T, R>(
 
   const workers = Array.from({ length: Math.min(limit, items.length) }, worker)
   await Promise.all(workers)
+
+  if (abortError && isAbortError(abortError)) throw abortError
+  throwIfAborted(signal)
   return results
 }

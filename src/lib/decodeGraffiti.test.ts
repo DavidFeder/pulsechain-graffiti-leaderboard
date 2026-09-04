@@ -5,7 +5,7 @@ function toHex(text: string, padTo = 32): string {
   const bytes = new TextEncoder().encode(text)
   const padded = new Uint8Array(padTo)
   padded.set(bytes.slice(0, padTo))
-  return `0x${Array.from(padded, (b) => b.toString(16).padStart(2, '0')).join('')}`
+  return `0x${Array.from(padded, b => b.toString(16).padStart(2, '0')).join('')}`
 }
 
 describe('decodeGraffiti', () => {
