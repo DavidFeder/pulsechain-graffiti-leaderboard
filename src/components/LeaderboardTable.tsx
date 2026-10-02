@@ -15,7 +15,7 @@ function Medal({ place, size = 'md' }: { place: 1 | 2 | 3; size?: 'sm' | 'md' | 
   if (place === 1) {
     return (
       <div
-        className={`flex items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 font-bold text-amber-950 shadow-inner ring-1 ring-yellow-400/60 ${dim}`}
+        className={`medal flex items-center justify-center rounded-full bg-gradient-to-br from-yellow-300 via-amber-400 to-yellow-600 font-bold text-amber-950 shadow-inner ring-1 ring-yellow-400/60 ${dim}`}
         aria-label="1st place"
         title="1st place - Gold"
       >
@@ -26,7 +26,7 @@ function Medal({ place, size = 'md' }: { place: 1 | 2 | 3; size?: 'sm' | 'md' | 
   if (place === 2) {
     return (
       <div
-        className={`flex items-center justify-center rounded-full bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400 font-bold text-slate-700 shadow-inner ring-1 ring-slate-300/60 ${dim}`}
+        className={`medal flex items-center justify-center rounded-full bg-gradient-to-br from-slate-200 via-slate-300 to-slate-400 font-bold text-slate-700 shadow-inner ring-1 ring-slate-300/60 ${dim}`}
         aria-label="2nd place"
         title="2nd place - Silver"
       >
@@ -36,7 +36,7 @@ function Medal({ place, size = 'md' }: { place: 1 | 2 | 3; size?: 'sm' | 'md' | 
   }
   return (
     <div
-      className={`flex items-center justify-center rounded-full bg-gradient-to-br from-orange-300 via-amber-500 to-orange-700 font-bold text-amber-100 shadow-inner ring-1 ring-orange-400/60 ${dim}`}
+      className={`medal flex items-center justify-center rounded-full bg-gradient-to-br from-orange-300 via-amber-500 to-orange-700 font-bold text-amber-100 shadow-inner ring-1 ring-orange-400/60 ${dim}`}
       aria-label="3rd place"
       title="3rd place - Bronze"
     >
@@ -52,7 +52,7 @@ function SlotLink({ slot }: { slot: number }) {
       href={slotExplorerUrl(slot)}
       target="_blank"
       rel="noopener noreferrer"
-      className="inline-flex items-center gap-0.5 text-[10px] text-zinc-500 hover:text-[#00D4FF] focus:outline-none focus-visible:underline"
+      className="link-accent inline-flex items-center gap-0.5 text-[10px] focus-ring"
       title={`Open slot ${slot.toLocaleString()} in explorer`}
     >
       slot {slot.toLocaleString()}
@@ -75,7 +75,7 @@ function PodiumCard({
   const isGold = place === 1
   return (
     <div
-      className={`flex flex-col items-center rounded-xl border px-3 pb-4 text-center ${
+      className={`podium-card flex flex-col items-center px-3 pb-4 text-center ${
         isGold
           ? 'min-w-[9.5rem] flex-[1.15] border-yellow-400/40 bg-yellow-400/[0.07] pt-6 sm:min-w-[12rem]'
           : place === 2
@@ -85,12 +85,12 @@ function PodiumCard({
     >
       <Medal place={place} size={isGold ? 'lg' : 'md'} />
       <div className="mt-3 flex max-w-full items-center gap-1.5">
-        <code className="graffiti-cell max-w-[10rem] truncate rounded bg-zinc-950 px-2 py-1 text-[12px] text-[#FF00AA] sm:max-w-[14rem]">
+        <code className="graffiti-cell graffiti-code max-w-[10rem] truncate px-2 py-1 text-[12px] sm:max-w-[14rem]">
           {entry.graffiti}
         </code>
         <button
           onClick={() => onCopy(entry.graffiti)}
-          className="rounded p-1 text-zinc-500 transition-colors hover:bg-zinc-900 hover:text-[#FF00AA] focus:outline-none focus:ring-1 focus:ring-[#FF00AA]/40"
+          className="copy-btn focus-ring"
           title="Copy graffiti to clipboard"
           aria-label={`Copy “${entry.graffiti}” to clipboard`}
         >
@@ -104,7 +104,7 @@ function PodiumCard({
       <div className={`mt-2 font-semibold tabular-nums ${isGold ? 'text-lg' : 'text-sm'}`}>
         {entry.count}
       </div>
-      <div className="text-[11px] text-zinc-500">{entry.percentage.toFixed(1)}%</div>
+      <div className="text-[11px] text-faint">{entry.percentage.toFixed(1)}%</div>
       <div className="mt-1">
         <SlotLink slot={entry.exampleSlot} />
       </div>
@@ -132,7 +132,7 @@ export function LeaderboardTable({ entries, searchTerm }: Props) {
 
   if (entries.length === 0) {
     return (
-      <div className="py-12 text-center text-zinc-500">
+      <div className="py-12 text-center text-faint">
         {searchTerm
           ? `No matches for “${searchTerm}”.`
           : 'No graffiti found in the selected range.'}
@@ -214,7 +214,7 @@ export function LeaderboardTable({ entries, searchTerm }: Props) {
                   <td className="w-12 pr-2">
                     <div className="flex items-center justify-center">
                       {getMetalBadge(index) || (
-                        <div className="flex h-7 w-7 items-center justify-center font-mono text-[11px] text-zinc-500">
+                        <div className="flex h-7 w-7 items-center justify-center font-mono text-[11px] text-faint">
                           {index + 1}
                         </div>
                       )}
@@ -222,12 +222,12 @@ export function LeaderboardTable({ entries, searchTerm }: Props) {
                   </td>
                   <td>
                     <div className="group flex items-center gap-2">
-                      <code className="graffiti-cell rounded bg-zinc-950 px-2 py-1 text-[13px] text-[#FF00AA]">
+                      <code className="graffiti-cell graffiti-code px-2 py-1 text-[13px]">
                         {entry.graffiti}
                       </code>
                       <button
                         onClick={() => copyToClipboard(entry.graffiti)}
-                        className="rounded p-1 text-zinc-500 opacity-60 transition-colors hover:bg-zinc-900 hover:text-[#FF00AA] group-hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-1 focus:ring-[#FF00AA]/40"
+                        className="copy-btn focus-ring"
                         title="Copy graffiti to clipboard"
                         aria-label={`Copy “${entry.graffiti}” to clipboard`}
                       >
@@ -241,7 +241,7 @@ export function LeaderboardTable({ entries, searchTerm }: Props) {
                     </div>
                   </td>
                   <td className="text-right font-medium tabular-nums">{entry.count}</td>
-                  <td className="text-right font-mono text-zinc-400">
+                  <td className="text-right font-mono text-muted">
                     {entry.percentage.toFixed(1)}%
                   </td>
                 </tr>
