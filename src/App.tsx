@@ -134,7 +134,7 @@ function App() {
   const showFullRefresh = result.isFromCache || isStale || result.incompleteFetch
 
   return (
-    <div className="min-h-screen page-bg text-[#ededed]">
+    <div className="min-h-screen page-bg">
       <div className="max-w-5xl mx-auto px-6 py-10">
         <ErrorBoundary key={errorBoundaryKey} onReset={() => setErrorBoundaryKey(k => k + 1)}>
           {/* Screen-reader live region for status updates */}
@@ -145,18 +145,16 @@ function App() {
           {/* Header */}
           <header className="header-atmosphere mb-10">
             <div className="flex items-center gap-4 mb-2">
-              <PulseChainLogo size={48} className="drop-shadow-[0_0_8px_rgba(255,0,170,0.4)]" />
+              <PulseChainLogo size={48} className="logo-glow" />
               <div>
-                <h1 className="flex items-center gap-3 text-4xl font-bold tracking-tighter">
+                <h1 className="page-title flex items-center gap-3 text-4xl">
                   <span>PulseChain</span>
-                  <span className="bg-gradient-to-r from-[#00D4FF] via-[#A855F7] to-[#FF00AA] bg-clip-text text-transparent">
-                    Graffiti Leaderboard
-                  </span>
+                  <span className="title-gradient">Graffiti Leaderboard</span>
                 </h1>
               </div>
             </div>
 
-            <p className="text-lg text-zinc-400 max-w-2xl">
+            <p className="text-lg text-muted max-w-2xl">
               Real beacon chain graffiti from the last{' '}
               <span className="font-mono">{WINDOW_SIZE}</span> slots.
             </p>
@@ -166,14 +164,10 @@ function App() {
           {showCacheBanner && !result.loading && (
             <div
               role="status"
-              className={`mb-6 flex flex-wrap items-center gap-3 rounded-lg border px-4 py-3 text-sm ${
-                isStale
-                  ? 'border-amber-900/60 bg-amber-950/60 text-amber-300'
-                  : 'border-zinc-800 bg-zinc-950'
-              }`}
+              className={`status-banner mb-6 ${isStale ? 'status-banner-stale' : 'status-banner-cache'}`}
             >
               <div
-                className={`flex items-center gap-2 ${isStale ? 'text-amber-400' : 'text-[#FF00AA]'}`}
+                className={`flex items-center gap-2 ${isStale ? 'text-amber-400' : 'pulse-accent'}`}
               >
                 {isStale ? (
                   <AlertTriangle className="h-4 w-4" aria-hidden="true" />
@@ -184,7 +178,7 @@ function App() {
                   {isStale ? 'Cache is stale' : 'Loaded from cache'}
                 </span>
               </div>
-              <div className={isStale ? 'text-amber-300/80' : 'text-zinc-400'}>
+              <div className={isStale ? 'text-amber-300/80' : 'text-muted'}>
                 Last synced {formatRelativeTime(result.cachedAt)} • up to slot{' '}
                 {result.lastHeadSlot?.toLocaleString()}
                 {isStale && (
@@ -194,7 +188,7 @@ function App() {
                 )}
               </div>
               {result.newSlotsAvailable > 0 && !isStale && (
-                <div className="ml-auto rounded bg-[#FF00AA]/10 px-3 py-1 text-xs font-medium text-[#FF00AA]">
+                <div className="accent-chip">
                   {result.newSlotsAvailable} new slots since last visit
                 </div>
               )}
@@ -202,10 +196,7 @@ function App() {
           )}
 
           {result.incompleteFetch && !result.loading && (
-            <div
-              role="status"
-              className="mb-6 flex flex-wrap items-center gap-3 rounded-lg border border-amber-900/60 bg-amber-950/60 px-4 py-3 text-sm text-amber-300"
-            >
+            <div role="status" className="status-banner status-banner-warn mb-6">
               <div className="flex items-center gap-2 text-amber-400">
                 <AlertTriangle className="h-4 w-4" aria-hidden="true" />
                 <span className="font-medium">Incomplete fetch</span>
@@ -227,12 +218,7 @@ function App() {
               disabled={result.loading}
               aria-busy={result.loading}
               title="Refresh (keyboard: R)"
-              className="flex items-center gap-2 text-white font-medium px-5 py-2.5 rounded text-sm transition-all disabled:bg-zinc-800 disabled:text-zinc-400 disabled:bg-none disabled:cursor-not-allowed focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF00AA] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a]"
-              style={{
-                background: result.loading
-                  ? undefined
-                  : 'linear-gradient(to right, #00D4FF, #FF00AA)',
-              }}
+              className="btn-primary focus-ring"
             >
               <>
                 <RefreshCw
@@ -249,10 +235,8 @@ function App() {
               <button
                 onClick={() => handleLoad(true)}
                 disabled={result.loading}
-                className={`flex items-center gap-2 border px-4 py-2.5 rounded text-sm transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF00AA] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a] ${
-                  isStale || result.incompleteFetch
-                    ? 'border-amber-700 hover:bg-amber-950 text-amber-300'
-                    : 'border-zinc-700 hover:bg-zinc-900'
+                className={`btn-ghost focus-ring ${
+                  isStale || result.incompleteFetch ? 'btn-ghost-warn' : ''
                 }`}
               >
                 Full refresh
@@ -261,7 +245,7 @@ function App() {
 
             <button
               onClick={handleShare}
-              className="flex items-center gap-2 border border-zinc-700 hover:bg-zinc-900 px-3 py-2.5 rounded text-sm text-zinc-300 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-[#FF00AA] focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a]"
+              className="btn-ghost focus-ring"
               title="Copy page link"
               aria-label="Share leaderboard — copy link"
             >
@@ -279,10 +263,7 @@ function App() {
             </button>
 
             {result.cachedAt && (
-              <button
-                onClick={handleClearCache}
-                className="flex items-center gap-2 border border-zinc-800 hover:bg-zinc-950 px-3 py-2.5 rounded text-sm text-zinc-400 transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-zinc-500 focus-visible:ring-offset-2 focus-visible:ring-offset-[#0a0a0a]"
-              >
+              <button onClick={handleClearCache} className="btn-ghost btn-quiet focus-ring">
                 Clear cache
               </button>
             )}
@@ -319,13 +300,10 @@ function App() {
               aria-valuemax={100}
               aria-label={loadingMessage}
             >
-              <div className="h-1.5 bg-zinc-800 rounded-full overflow-hidden">
-                <div
-                  className="h-1.5 bg-gradient-to-r from-[#00D4FF] to-[#FF00AA] transition-all duration-200"
-                  style={{ width: `${result.progress}%` }}
-                />
+              <div className="progress-track">
+                <div className="progress-fill" style={{ width: `${result.progress}%` }} />
               </div>
-              <div className="text-xs text-zinc-500 mt-1.5 flex items-center gap-2">
+              <div className="text-xs text-faint mt-1.5 flex items-center gap-2">
                 <Cpu className="w-3 h-3" aria-hidden="true" />
                 {loadingMessage} — previous results stay visible until the new data is ready
               </div>
@@ -338,7 +316,7 @@ function App() {
               <StatsCards result={result} />
 
               <div className="mb-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                <div className="text-sm font-medium text-zinc-300" id="leaderboard-heading">
+                <div className="text-sm font-medium text-soft" id="leaderboard-heading">
                   Top Graffiti (real beacon data)
                 </div>
                 <div className="flex items-center gap-2">
@@ -351,13 +329,13 @@ function App() {
                     value={searchTerm}
                     onChange={e => setSearchTerm(e.target.value)}
                     placeholder="Filter graffiti (e.g. pulse, pls, love...)"
-                    className="w-full sm:w-72 bg-black border border-zinc-700 rounded px-3 py-1.5 text-sm font-mono focus:outline-none focus:border-[#FF00AA] focus-visible:ring-1 focus-visible:ring-[#FF00AA] placeholder:text-zinc-600"
+                    className="field-input focus-ring"
                     autoComplete="off"
                   />
                   {trimmedSearch && (
                     <button
                       onClick={() => setSearchTerm('')}
-                      className="flex items-center gap-1 px-2 py-1 text-xs text-zinc-400 hover:text-zinc-200 border border-zinc-800 rounded hover:bg-zinc-950 transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-500"
+                      className="btn-tiny focus-ring"
                       title="Clear filter"
                       aria-label="Clear filter"
                     >
@@ -368,26 +346,20 @@ function App() {
               </div>
 
               {trimmedSearch && !noFilterMatches && (
-                <div className="text-[10px] text-zinc-500 -mt-1 mb-2" aria-live="polite">
+                <div className="text-[10px] text-faint -mt-1 mb-2" aria-live="polite">
                   Showing {displayedEntries.length} of {result.entries.length} matching “
                   {trimmedSearch}”
                 </div>
               )}
 
               {noFilterMatches ? (
-                <div
-                  className="text-center py-12 text-zinc-500 border border-dashed border-zinc-800 rounded-xl"
-                  role="status"
-                >
+                <div className="empty-panel py-12" role="status">
                   <Search className="w-8 h-8 mx-auto mb-3 opacity-40" aria-hidden="true" />
-                  <div className="font-medium text-zinc-400">
+                  <div className="font-medium text-muted">
                     No graffiti matched “{trimmedSearch}”
                   </div>
                   <div className="text-xs mt-1.5">Try a different filter or clear the search.</div>
-                  <button
-                    onClick={() => setSearchTerm('')}
-                    className="mt-4 text-xs border border-zinc-700 hover:bg-zinc-900 px-3 py-1.5 rounded transition-colors focus:outline-none focus-visible:ring-1 focus-visible:ring-zinc-500"
-                  >
+                  <button onClick={() => setSearchTerm('')} className="btn-tiny focus-ring mt-4">
                     Clear filter
                   </button>
                 </div>
@@ -406,17 +378,17 @@ function App() {
               <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-8">
                 {[0, 1, 2, 3].map(i => (
                   <div key={i} className="stat-card">
-                    <div className="skeleton-pulse mb-3 h-3 w-24 rounded bg-zinc-800" />
-                    <div className="skeleton-pulse h-8 w-16 rounded bg-zinc-800" />
+                    <div className="skeleton-pulse skeleton-block mb-3 h-3 w-24" />
+                    <div className="skeleton-pulse skeleton-block h-8 w-16" />
                   </div>
                 ))}
               </div>
               <div className="space-y-3">
                 {[0, 1, 2, 3, 4, 5].map(i => (
-                  <div key={i} className="flex items-center gap-3 border-b border-zinc-900 pb-3">
-                    <div className="skeleton-pulse h-7 w-7 shrink-0 rounded-full bg-zinc-800" />
-                    <div className="skeleton-pulse h-6 flex-1 rounded bg-zinc-800" />
-                    <div className="skeleton-pulse h-4 w-12 rounded bg-zinc-800" />
+                  <div key={i} className="skeleton-row flex items-center gap-3 pb-3">
+                    <div className="skeleton-pulse skeleton-block h-7 w-7 shrink-0 rounded-full" />
+                    <div className="skeleton-pulse skeleton-block h-6 flex-1" />
+                    <div className="skeleton-pulse skeleton-block h-4 w-12" />
                   </div>
                 ))}
               </div>
@@ -425,28 +397,25 @@ function App() {
 
           {/* Initial empty / first-load state */}
           {!result.loading && !hasResults && !result.error && (
-            <div
-              className="text-center py-16 text-zinc-500 border border-dashed border-zinc-800 rounded-xl"
-              role="status"
-            >
-              <div className="font-medium text-zinc-400 mb-1">No data yet</div>
+            <div className="empty-panel py-16" role="status">
+              <div className="font-medium text-muted mb-1">No data yet</div>
               <div className="text-sm">
                 Click “Load Leaderboard” to fetch the latest graffiti from the beacon chain.
               </div>
-              <div className="text-xs mt-3 text-zinc-600">
+              <div className="text-xs mt-3 text-dim">
                 Returning visitors get instant results from local cache.
               </div>
             </div>
           )}
 
           {/* Footer */}
-          <footer className="mt-16 pt-6 border-t border-zinc-800 text-center text-sm text-zinc-500">
+          <footer className="site-footer">
             <div className="flex flex-wrap justify-center gap-x-4 gap-y-1">
               <a
                 href="https://github.com/DavidFeder/pulsechain-graffiti-leaderboard"
                 target="_blank"
                 rel="noopener noreferrer"
-                className="hover:text-zinc-300 transition-colors focus:outline-none focus-visible:underline"
+                className="focus-ring rounded-sm"
               >
                 GitHub
               </a>
@@ -457,12 +426,8 @@ function App() {
               <span className="hidden sm:inline" aria-hidden="true">
                 •
               </span>
-              <span className="text-zinc-600">
-                Press{' '}
-                <kbd className="px-1 py-0.5 rounded bg-zinc-900 border border-zinc-700 text-[10px]">
-                  R
-                </kbd>{' '}
-                to refresh
+              <span className="text-dim">
+                Press <kbd className="kbd-key">R</kbd> to refresh
               </span>
             </div>
           </footer>
