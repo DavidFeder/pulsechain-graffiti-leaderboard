@@ -19,12 +19,9 @@ import { WINDOW_SIZE, HEAD_POLL_INTERVAL_MS } from './lib/constants'
 import { formatRelativeTime } from './utils/formatRelativeTime'
 import { copyText } from './utils/clipboard'
 import { incompleteFetchMessage } from './lib/beacon/fetchOutcome'
-import { ThemeSwitcher } from './components/ThemeSwitcher'
-import { useThemeSample } from './theme/useThemeSample'
 
 function App() {
   const { result, load, checkForUpdates, clearCache } = useBeaconGraffiti()
-  const { themeId, selectTheme } = useThemeSample()
   const [searchTerm, setSearchTerm] = useState('')
   const [copiedLink, setCopiedLink] = useState(false)
   const [errorBoundaryKey, setErrorBoundaryKey] = useState(0)
@@ -162,8 +159,6 @@ function App() {
               <span className="font-mono">{WINDOW_SIZE}</span> slots.
             </p>
           </header>
-
-          <ThemeSwitcher themeId={themeId} onSelect={selectTheme} />
 
           {/* Cache status banner - enhanced with staleness warning (takes precedence when stale) */}
           {showCacheBanner && !result.loading && (
